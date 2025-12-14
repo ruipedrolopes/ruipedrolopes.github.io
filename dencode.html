@@ -1706,23 +1706,23 @@
             if (ev.dataTransfer.items) {
                 // Use DataTransferItemList interface to access the file(s)
                 [...ev.dataTransfer.items].forEach((item, i) => {
-                // If dropped items aren't files, reject them
-                if (item.kind === "file") {
-                    const file = item.getAsFile();
-                    console.log(`1… file[${i}].name = ${file.name}`);
-                    debugger;
+                    // If dropped items aren't files, reject them
+                    if (item.kind === "file") {
+                        const file = item.getAsFile();
+                        console.log(`1… file[${i}].name = ${file.name}`);
+                        debugger;
 
 
-                    //reader = new FileReader();
+                        //reader = new FileReader();
 
-                    //reader.readAsDataURL(file);
-                }
+                        //reader.readAsDataURL(file);
+                    }
                 });
             } else {
                 // Use DataTransfer interface to access the file(s)
                 [...ev.dataTransfer.files].forEach((file, i) => {
-                console.log(`2… file[${i}].name = ${file.name}`);
-                debugger;
+                    console.log(`2… file[${i}].name = ${file.name}`);
+                    debugger;
                 });
             }
         }
@@ -1789,7 +1789,7 @@
 </head>
 
 <body>
-    <textarea id="value" value="" placeholder="Text goes here..." autofocus ondrop="dropHandler(event);"></textarea>
+    <textarea id="value" value="" placeholder="Text goes here..." autofocus ondrop="dropHandler(event);" spellcheck="false"></textarea>
     <div style="float: right;position: relative;font-size: small; margin-top: 0.2rem">Line: <span id="line"></span><span
             style="margin-left: 10px;">Column: </span><span id="col"></span></div>
     <div style="float: right;clear: right;position: relative;font-size: small;">Start: <span id="start"></span><span
@@ -1932,7 +1932,7 @@
                 <div class="overlay" style="position: fixed; top:0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; background-color: #000000bd; z-index: 1001; display: none;">
                     <div style="position: relative; width: 500px; height: 700px; background-color: #909090; margin: auto;">
 
-                        <textarea id="replicateTemplateItemsBuilder" placeholder="items: one per line" style="height: 600px;"></textarea>
+                        <textarea id="replicateTemplateItemsBuilder" placeholder="items: one per line" style="height: 600px;" spellcheck="false"></textarea>
                 
                         <div style="margin: auto;align-items: center;display: flex;height: 100px;width: fit-content;">
                             <button class="button button-xsmall" onclick="this.closest('.overlay').style.display='none'">Close</button>&nbsp;

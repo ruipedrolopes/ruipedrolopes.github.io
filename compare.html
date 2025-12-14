@@ -292,6 +292,8 @@
 
     <script type="text/javascript">
 
+        let lock = false;
+
         window.onload = function () {
             const value1TextArea = getValue1Element();
             value1TextArea.addEventListener("keyup", compare);
@@ -382,24 +384,38 @@
         }
 
         function compare() {
-            const leftText = getValue1Element().value;
-            const rightText = getValue2Element().value;
+            try {
+                if (lock) {
+                    return;
+                }
+                lock = true;
 
-            // Generate the diff
-            const differences = Diff.createTwoFilesPatch('Left', 'Rigth', leftText, rightText);
+                const leftText = getValue1Element().value;
+                const rightText = getValue2Element().value;
 
-            const configuration = {
-                outputFormat: getOutputFormat(),
-                drawFileList: false,
-                matching: 'lines',
-                colorScheme: 'dark',
-                diffStyle: 'char'
-            };
-            const targetElement = document.getElementById('compareResult');
-            const diff2htmlUi = new Diff2HtmlUI(targetElement, differences, configuration);
-            diff2htmlUi.draw();
-            diff2htmlUi.fileListToggle(false);
-            //diff2htmlUi.highlightCode();
+                let differences = "";
+                // Generate the diff
+                if(leftText.length + rightText.length > 10_000) {
+                    differences = wasmCompareStrings(leftText, rightText, 'Left', 'Rigth');
+                } else {
+                    differences = Diff.createTwoFilesPatch('Left', 'Rigth', leftText, rightText);
+                }
+
+                const configuration = {
+                    outputFormat: getOutputFormat(),
+                    drawFileList: false,
+                    matching: 'lines',
+                    colorScheme: 'dark',
+                    diffStyle: 'char'
+                };
+                const targetElement = document.getElementById('compareResult');
+                const diff2htmlUi = new Diff2HtmlUI(targetElement, differences, configuration);
+                diff2htmlUi.draw();
+                diff2htmlUi.fileListToggle(false);
+                //diff2htmlUi.highlightCode();
+            } finally {
+                lock = false;
+            }
         }
 
         function getOutputFormat() {
@@ -498,6 +514,16 @@
         }
     </script>
 
+    <script type="module">
+        import init, { diff_unified } from './wasm/rust/string_diff_wasm/pkg/string_diff_wasm.js';
+
+        init().then(() => {
+            window.wasmCompareStrings = (a, b, a_label, b_label) => {
+                return diff_unified(a, b, a_label, b_label);
+            };
+        });
+    </script>
+
     <!-- Libs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/4.0.2/diff.min.js"></script>
 
@@ -516,7 +542,7 @@
 <body>
     <div>
         <div style="width: 50%; float: left;">
-            <textarea id="value1" value="" placeholder="Original text" autofocus tabindex="1" class="nowrap"></textarea>
+            <textarea id="value1" value="" placeholder="Original text" autofocus tabindex="1" class="nowrap" spellcheck="false"></textarea>
             <div style="padding-top: 5px">
                 <div style="float: left;">
                     <label class="switch">
@@ -538,7 +564,7 @@
             </div>
         </div>
         <div style="width: 50%; float: right;">
-            <textarea id="value2" value="" placeholder="Text to compare" tabindex="2" class="nowrap"></textarea>
+            <textarea id="value2" value="" placeholder="Text to compare" tabindex="2" class="nowrap" spellcheck="false"></textarea>
             <div style="padding-top: 5px">
                 <div style="float: right;position: relative;font-size: small; margin-top: 0.2rem">Line: <span id="line2"></span>
                     <span style="margin-left: 10px;">Column: </span><span id="col2"></span>

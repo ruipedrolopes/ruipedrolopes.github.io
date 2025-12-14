@@ -1,0 +1,2 @@
+[workspace]
+members = ["string_diff_wasm"]

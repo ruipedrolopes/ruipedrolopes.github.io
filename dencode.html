@@ -423,11 +423,30 @@
             border: none;
             background: transparent;
         }
+
+        .success-tag {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: greenyellow;
+            color: black;
+            font-weight: 600;
+            padding: 0.1rem;
+            border-radius: 0.2rem;
+        }
+
+        .error-tag {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: tomato;
+            color: black;
+            font-weight: 600;
+            padding: 0.1rem;
+            border-radius: 0.2rem;
+        }
+
     </style>
     <script type="text/javascript">
 
         window.onload = function () {
-            var valueTextArea = getValueElement();
+            const valueTextArea = getValueElement();
             valueTextArea.onmouseup =
             valueTextArea.onkeyup =
             valueTextArea.ontouchend =
@@ -442,6 +461,17 @@
             adjustRndStringSlider(document.getElementById("rndStringLength"));
 
             initHistory();
+
+            window.setInterval(() => {
+                //if not modified in the last 2 seconds return
+                if (new Date().getTime() - window.valueTouched.getTime() > 2000) {
+                    return;
+                }
+
+                const detected = detectFormatOrLanguage();
+
+                updateDetectedFormatDisplay(detected);
+            }, 2000);
         }
 
         function isAsync(func) {
@@ -650,7 +680,7 @@
             }
         }
 
-        var auxiliary = {
+        const auxiliary = {
 
             uuidv4: function () {
                 try {
@@ -662,42 +692,7 @@
                         (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
                     );
                 }
-
-
             },
-
-            /*arrayBufferToBase64: function (buffer) {
-                var binary = '';
-                var bytes = new Uint8Array(buffer);
-                var len = bytes.byteLength;
-                for (var i = 0; i < len; i++) {
-                    binary += String.fromCharCode(bytes[i]);
-                }
-                return auxiliary.bytesToBase64(new TextEncoder().encode(binary));
-                //return auxiliary.utf8ToBase64(new TextEncoder().encode(binary));
-            },
-
-            base64ToArrayBuffer: function (base64) {
-                var binary_string = new TextDecoder().decode(auxiliary.base64ToBytes(base64));
-                //var binary_string = auxiliary.base64ToUtf8(base64);
-                
-                var len = binary_string.length;
-                var bytes = new Uint8Array(len);
-                for (var i = 0; i < len; i++)        {
-                    bytes[i] = binary_string.charCodeAt(i);
-                }
-                return bytes.buffer;
-            },
-
-            base64ToBytes: function (base64) {
-                const binString = atob(base64);
-                return Uint8Array.from(binString, (m) => m.codePointAt(0));
-            },
-
-            bytesToBase64: function (bytes) {
-                const binString = String.fromCodePoint(...bytes);
-                return btoa(binString);
-            },*/
 
             utf8ToBase64: function (str) {
                 const encoder = new TextEncoder();
@@ -713,8 +708,126 @@
                 }
                 const decoder = new TextDecoder();
                 return decoder.decode(uint8Array);
-            }
+            },
 
+            // detects if a string is valid JSON, malformed JSON, or not JSON at all.
+            // Returns:
+            //   - true: if the string is valid JSON.
+            //   - false: if the string is not trying to be JSON.
+            //   - object: with error details if the string is a malformed JSON.
+            isJson: function (str) {
+                if (typeof str !== 'string') {
+                    return false;
+                }
+                const trimmed = str.trim();
+                if (trimmed === '') {
+                    return false;
+                }
+
+                // If the string contains newlines, it must start with '{', '[', or '"' 
+                // to be considered a potentially valid multi-line JSON document.
+                // This rejects cases like "123\nhello" which some parsers accept.
+                if (trimmed.includes('\n') || trimmed.includes('\r')) {
+                    const firstChar = trimmed[0];
+                    if (!['{', '[', '"'].includes(firstChar)) {
+                        return false;
+                    }
+                }
+                
+                try {
+                    JSON.parse(str);
+                    return true;
+                } catch (e) {
+                    // Heuristic to determine if it's a malformed attempt vs. not JSON at all.
+                    const firstChar = trimmed[0];
+                    if (['{', '[', '"'].includes(firstChar) || /^(-|true|false|null)/i.test(trimmed) || (firstChar >= '0' && firstChar <= '9')) {
+                        return { name: e.name, message: e.message, exception: e };
+                    }
+                    return false;
+                }
+            },
+
+            // detects if a string is valid XML, malformed XML, or not XML at all.
+            // Returns:
+            //   - true: if the string is well-formed XML.
+            //   - false: if the string is not trying to be XML.
+            //   - object: with error details if the string is a malformed XML.
+            isXml: function (str) {
+                if (typeof str !== 'string') {
+                    return false;
+                }
+                const trimmedStr = str.trim();
+                if (trimmedStr === '') {
+                    return false;
+                }
+                const xmlLikeRegex = /^\s*<(\?|!|(\w)|(\/))/;
+                if (!xmlLikeRegex.test(trimmedStr)) {
+                    return false;
+                }
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(str, "application/xml");
+                const parserError = xmlDoc.querySelector("parsererror");
+                if (parserError) {
+                    return {
+                        name: "XMLParserError",
+                        message: parserError.textContent || "Malformed XML",
+                        details: parserError
+                    };
+                }
+                return true;
+            },
+
+            // detects if a string is Base64 encoded, supporting multi-line input.
+            isBase64: function(str) {
+                if (typeof str !== 'string' || str.trim() === '') {
+                    return false;
+                }
+                const cleanStr = str.replace(/\s/g, '');
+                if (cleanStr.length % 4 !== 0) {
+                    return false;
+                }
+                const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+                return base64Regex.test(cleanStr);
+            },
+
+            // detects if a string is Hex encoded, supporting multi-line input.
+            isHex: function(str) {
+                if (typeof str !== 'string' || str.trim() === '') {
+                    return false;
+                }
+                const cleanStr = str.replace(/\s/g, '');
+                if (cleanStr.length === 0) {
+                    return false;
+                }
+                if (cleanStr.length % 2 !== 0) {
+                    return false;
+                }
+                const hexRegex = /^[0-9a-fA-F]+$/;
+                return hexRegex.test(cleanStr);
+            },
+            
+            isYaml: function (str) {
+                if (typeof str !== 'string' || str.trim() === '') {
+                    return false;
+                }
+                const yamlIndicators = [
+                    /:\s*$/m,               // key:
+                    /^\s*-\s+/m,            // - item
+                    /^\s*\w+\s*:\s*.+$/m,   // key: value
+                    /^\s*#/,                // comment
+                    /^\s*---\s*$/m          // document start
+                ];
+                for (const regex of yamlIndicators) {
+                    if (regex.test(str)) {
+                        return true;
+                    }
+                }
+                return false;
+            },
+
+            yamlToObject: function(str) {
+                //TODO
+            }
         };
 
         //Generators
@@ -1458,6 +1571,12 @@
             valueTextArea.focus();
         }
 
+        function copyValue() {
+            const valueTextArea = getValueElement();
+            copyToClipboard(valueTextArea.value);
+            info("Value copied to clipboard!");
+        }
+
         function cropToSelection() {
             const valueTextArea = getValueElement();
             valueTextArea.value = valueTextArea.value.substr(cursorPos.start, cursorPos.end - cursorPos.start);
@@ -1477,7 +1596,7 @@
             a.click();
         }
 
-        var cursorPos = {
+        let cursorPos = {
             start: -1,
             end: -1,
             line: -1,
@@ -1587,6 +1706,7 @@
             return start - index - 1;
         }
 
+        window.valueTouched = new Date();
         function fetchData() {
             if(document.activeElement == getValueElement()) {
                 const valueTextArea = getValueElement();
@@ -1594,11 +1714,55 @@
 
                 document.getElementById("start").innerHTML = pos.start;
                 document.getElementById("end").innerHTML = pos.end;
+                document.getElementById("selection").innerHTML = pos.end - pos.start;
                 document.getElementById("length").innerHTML = valueTextArea.value.length;
 
                 document.getElementById("line").innerHTML = pos.line;
                 document.getElementById("col").innerHTML = pos.column;
+
+                window.valueTouched = new Date();
             }
+        }
+
+        function detectFormatOrLanguage() {
+            const valueTextArea = getValueElement();
+            const value = valueTextArea.value;
+
+            // Check for JSON (three-state return)
+            const jsonCheckResult = auxiliary.isJson(value);
+            if (jsonCheckResult === true) {
+                return { type: "JSON", valid: true };
+            } else if (typeof jsonCheckResult === 'object') {
+                console.error("Malformed JSON detected: " + jsonCheckResult.message);
+                return { type: "JSON", valid: false, error: jsonCheckResult };
+            }
+
+            // Check for XML (three-state return)
+            const xmlCheckResult = auxiliary.isXml(value);
+            if (xmlCheckResult === true) {
+                return { type: "XML", valid: true };
+            } else if (typeof xmlCheckResult === 'object') {
+                console.error("Malformed XML detected: " + xmlCheckResult.message);
+                return { type: "XML", valid: false, error: xmlCheckResult };
+            }
+
+            // Check for YAML (boolean return)
+            if (auxiliary.isYaml(value) === true) {
+                return { type: "YAML", valid: true };
+            }
+            
+            // Check for Base64 (boolean return)
+            if (auxiliary.isBase64(value) === true) {
+                return { type: "Base64", valid: true };
+            }
+            
+            // Check for Hex (boolean return)
+            if (auxiliary.isHex(value) === true) {
+                return { type: "Hex", valid: true };
+            }
+
+            // Format not detected
+            return null;
         }
 
         function rndSpecialChanged(event) {
@@ -1609,7 +1773,7 @@
             }
         }
 
-        var stopRndChangeEvent = false;
+        let stopRndChangeEvent = false;
 
         function preventInvalidSpecialChars(event) {
             if (event.keyCode < 32) {
@@ -1641,7 +1805,7 @@
             };
         }
 
-        var messageId = null;
+        let messageId = null;
         function info(text, delay) {
             document.getElementById("messageType").innerHTML = "&#8505;&nbsp;Info";
             document.getElementById("messageText").innerText = text;
@@ -1785,16 +1949,51 @@
             }
         }
 
+        function updateDetectedFormatDisplay(detected) {
+            const detectedFormatDiv = document.getElementById("detectedFormatDiv");
+            const formatIdentifier = document.getElementById("formatIdentifier");
+            const formatValidity = document.getElementById("formatValidity");
+
+            if(detected == null) {
+                detectedFormatDiv.style.display = "none";
+                formatIdentifier.innerText = "";
+                formatValidity.innerText = "";
+                return;
+            }
+
+            detectedFormatDiv.style.display = "block";
+            formatIdentifier.innerText = detected.type;
+
+            if(detected.valid === false) {
+                formatIdentifier.classList.add("error-tag");
+                formatIdentifier.classList.remove("success-tag");
+                formatValidity.innerText = detected.error.message;
+            } else {
+                formatIdentifier.classList.remove("error-tag");
+                formatIdentifier.classList.add("success-tag");
+                formatValidity.innerText = "";
+            }
+        }
+
     </script>
 </head>
 
 <body>
-    <textarea id="value" value="" placeholder="Text goes here..." autofocus ondrop="dropHandler(event);"></textarea>
-    <div style="float: right;position: relative;font-size: small; margin-top: 0.2rem">Line: <span id="line"></span><span
-            style="margin-left: 10px;">Column: </span><span id="col"></span></div>
-    <div style="float: right;clear: right;position: relative;font-size: small;">Start: <span id="start"></span><span
-            style="margin-left: 10px;">End: </span><span id="end"></span><span style="margin-left: 10px;">Length:
-        </span><span id="length"></span></div>
+    <textarea id="value" value="" placeholder="Text goes here..." autofocus ondrop="dropHandler(event);" spellcheck="false"></textarea>
+    <div style="float: right;position: relative;font-size: small; margin-top: 0.2rem">
+        Line: <span id="line"></span>
+        <span style="margin-left: 10px;">Column: </span><span id="col"></span>
+    </div>
+    <div style="float: right;clear: right;position: relative;font-size: small;">
+        Start: <span id="start"></span>
+        <span style="margin-left: 10px;">End: </span><span id="end"></span>
+        <span style="margin-left: 10px;">Selection: </span><span id="selection"></span>
+        <span style="margin-left: 10px;">Length:</span><span id="length"></span>
+    </div>
+    <div style="float: right; clear: right; position: relative; font-size: small; padding-top: 0.3rem; text-align: end; display: none" id="detectedFormatDiv">
+        <span id="formatIdentifier" class="error-tag" style="display: block; float: right;"></span>
+        <span id="formatValidity" style="color: orange; padding-top: 0.2rem; display: block; clear: right; max-width: 25rem;"></span>
+    </div>
     <div>
         <!--TODO review/improve url and html encoders-->
         <div class="buttonGroup">
@@ -1932,7 +2131,7 @@
                 <div class="overlay" style="position: fixed; top:0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; background-color: #000000bd; z-index: 1001; display: none;">
                     <div style="position: relative; width: 500px; height: 700px; background-color: #909090; margin: auto;">
 
-                        <textarea id="replicateTemplateItemsBuilder" placeholder="items: one per line" style="height: 600px;"></textarea>
+                        <textarea id="replicateTemplateItemsBuilder" placeholder="items: one per line" style="height: 600px;" spellcheck="false"></textarea>
                 
                         <div style="margin: auto;align-items: center;display: flex;height: 100px;width: fit-content;">
                             <button class="button button-xsmall" onclick="this.closest('.overlay').style.display='none'">Close</button>&nbsp;
@@ -1960,6 +2159,8 @@
     <hr />
     <div>
         <div class="buttonGroup">
+            <input type="button" class="button button-xsmall" value="Copy"
+                onclick="copyValue();" title="Copy all text" /><br/>
             <input type="button" class="button button-xsmall" value="Clear"
                 onclick="clearValue();" /><br/>
             <input type="button" class="button button-xsmall" value="Crop"
@@ -1969,7 +2170,7 @@
         </div>
         <div class="buttonGroup">
             <input type="button" class="button button-xsmall" value="New GUID"
-                onclick="generate(gens.generateGuid);" /><br/>
+                onclick="generate(gens.generateGuid);" title="Generate new GUID/UUID" /><br/>
             <input type="button" class="button button-xsmall" value="ISO DateTime"
                 onclick="generate(gens.isoDateTime);" /><br/>
             <input type="button" class="button button-xsmall" value="Epoch"

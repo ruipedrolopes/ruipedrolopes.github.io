@@ -462,16 +462,25 @@
 
             initHistory();
 
-            window.setInterval(() => {
-                //if not modified in the last 2 seconds return
-                if (new Date().getTime() - window.valueTouched.getTime() > 2000) {
-                    return;
+            let lastValue = "";
+            function autoDetect() {
+                try {
+                    const currentValue = getValueElement().value;
+                    if (currentValue !== lastValue) {
+                        // if modified in the last 1 second return (debounce)
+                        if (new Date().getTime() - window.valueTouched.getTime() >= 1000) {
+                            lastValue = currentValue;
+                            const detected = detectFormatOrLanguage();
+                            updateDetectedFormatDisplay(detected);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Auto-detect error:", e);
+                } finally {
+                    window.setTimeout(autoDetect, 1000);
                 }
-
-                const detected = detectFormatOrLanguage();
-
-                updateDetectedFormatDisplay(detected);
-            }, 2000);
+            }
+            autoDetect();
         }
 
         function isAsync(func) {
@@ -719,28 +728,19 @@
                 if (typeof str !== 'string') {
                     return false;
                 }
-                const trimmed = str.trim();
-                if (trimmed === '') {
+                // Peek first and last non-whitespace characters
+                const startMatch = str.match(/^\s*([{\["\d-]|true|false|null)/);
+                if (!startMatch) {
                     return false;
                 }
 
-                // If the string contains newlines, it must start with '{', '[', or '"' 
-                // to be considered a potentially valid multi-line JSON document.
-                // This rejects cases like "123\nhello" which some parsers accept.
-                if (trimmed.includes('\n') || trimmed.includes('\r')) {
-                    const firstChar = trimmed[0];
-                    if (!['{', '[', '"'].includes(firstChar)) {
-                        return false;
-                    }
-                }
-                
                 try {
-                    JSON.parse(str);
-                    return true;
+                    const data = JSON.parse(str);
+                    return { valid: true, data: data };
                 } catch (e) {
                     // Heuristic to determine if it's a malformed attempt vs. not JSON at all.
-                    const firstChar = trimmed[0];
-                    if (['{', '[', '"'].includes(firstChar) || /^(-|true|false|null)/i.test(trimmed) || (firstChar >= '0' && firstChar <= '9')) {
+                    const firstChar = startMatch[1][0];
+                    if (['{', '[', '"'].includes(firstChar) || /^(-|true|false|null)/i.test(startMatch[1]) || (firstChar >= '0' && firstChar <= '9')) {
                         return { name: e.name, message: e.message, exception: e };
                     }
                     return false;
@@ -753,15 +753,11 @@
             //   - false: if the string is not trying to be XML.
             //   - object: with error details if the string is a malformed XML.
             isXml: function (str) {
-                if (typeof str !== 'string') {
-                    return false;
-                }
-                const trimmedStr = str.trim();
-                if (trimmedStr === '') {
+                if (typeof str !== 'string' || str.length === 0) {
                     return false;
                 }
                 const xmlLikeRegex = /^\s*<(\?|!|(\w)|(\/))/;
-                if (!xmlLikeRegex.test(trimmedStr)) {
+                if (!xmlLikeRegex.test(str)) {
                     return false;
                 }
                 const parser = new DOMParser();
@@ -779,11 +775,16 @@
 
             // detects if a string is Base64 encoded, supporting multi-line input.
             isBase64: function(str) {
-                if (typeof str !== 'string' || str.trim() === '') {
+                if (typeof str !== 'string' || str.length === 0) {
+                    return false;
+                }
+                // Quick check: does it contain non-base64 characters?
+                // This is much faster than replace on large strings.
+                if (/[^A-Za-z0-9+/=\s]/.test(str)) {
                     return false;
                 }
                 const cleanStr = str.replace(/\s/g, '');
-                if (cleanStr.length % 4 !== 0) {
+                if (cleanStr.length === 0 || cleanStr.length % 4 !== 0) {
                     return false;
                 }
                 const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -792,14 +793,15 @@
 
             // detects if a string is Hex encoded, supporting multi-line input.
             isHex: function(str) {
-                if (typeof str !== 'string' || str.trim() === '') {
+                if (typeof str !== 'string' || str.length === 0) {
+                    return false;
+                }
+                // Quick check: does it contain non-hex characters?
+                if (/[^0-9a-fA-F\s]/.test(str)) {
                     return false;
                 }
                 const cleanStr = str.replace(/\s/g, '');
-                if (cleanStr.length === 0) {
-                    return false;
-                }
-                if (cleanStr.length % 2 !== 0) {
+                if (cleanStr.length === 0 || cleanStr.length % 2 !== 0) {
                     return false;
                 }
                 const hexRegex = /^[0-9a-fA-F]+$/;
@@ -807,9 +809,11 @@
             },
             
             isYaml: function (str) {
-                if (typeof str !== 'string' || str.trim() === '') {
+                if (typeof str !== 'string' || str.length === 0) {
                     return false;
                 }
+                // YAML is very broad; we only check a portion to avoid regex hanging on massive strings
+                const sample = str.substring(0, 10000);
                 const yamlIndicators = [
                     /:\s*$/m,               // key:
                     /^\s*-\s+/m,            // - item
@@ -818,7 +822,7 @@
                     /^\s*---\s*$/m          // document start
                 ];
                 for (const regex of yamlIndicators) {
-                    if (regex.test(str)) {
+                    if (regex.test(sample)) {
                         return true;
                     }
                 }
@@ -1605,10 +1609,23 @@
         
         function getCursorPos(input) {
             if ("selectionStart" in input && document.activeElement == input) {
-                cursorPos.start = input.selectionStart;
+                const text = input.value;
+                const start = input.selectionStart;
+                cursorPos.start = start;
                 cursorPos.end = input.selectionEnd;
-                cursorPos.line = input.value.substr(0, input.selectionStart).split(/\r?\n|\r/).length;
-                cursorPos.column = getCol(input, input.selectionStart);
+                
+                let line = 1;
+                let lastNewLine = text.lastIndexOf('\n', start - 1);
+                const column = start - lastNewLine - 1;
+
+                let pos = lastNewLine;
+                while (pos !== -1) {
+                    line++;
+                    pos = text.lastIndexOf('\n', pos - 1);
+                }
+
+                cursorPos.line = line;
+                cursorPos.column = column;
                 return cursorPos;
             }
             else if (input.createTextRange) {
@@ -1629,8 +1646,17 @@
                         pos.end++;
                     }
 
-                    pos.line = input.value.substr(0, input.selectionStart).split(/\r?\n|\r/).length;
-                    pos.column = getCol(input, input.selectionStart);
+                    const text = input.value;
+                    let line = 1;
+                    let lastNewLine = -1;
+                    for (let i = 0; i < pos.start; i++) {
+                        if (text[i] === '\n') {
+                            line++;
+                            lastNewLine = i;
+                        }
+                    }
+                    pos.line = line;
+                    pos.column = pos.start - lastNewLine - 1;
                     cursorPos = pos;
                     return cursorPos;
                 }
@@ -1698,12 +1724,12 @@
         }
 
         function getCol(value, start) {
+            const text = value.value;
             let index = start;
-            let char = '\n';
-            do {
-                char = value.value[-1 + index--];
-            } while (char != '\n' && char != '\r' && index >= 0);
-            return start - index - 1;
+            while (index > 0 && text[index - 1] !== '\n' && text[index - 1] !== '\r') {
+                index--;
+            }
+            return start - index;
         }
 
         window.valueTouched = new Date();
@@ -1730,8 +1756,8 @@
 
             // Check for JSON (three-state return)
             const jsonCheckResult = auxiliary.isJson(value);
-            if (jsonCheckResult === true) {
-                return { type: "JSON", valid: true };
+            if (jsonCheckResult.valid === true) {
+                return { type: "JSON", valid: true, data: jsonCheckResult.data };
             } else if (typeof jsonCheckResult === 'object') {
                 console.error("Malformed JSON detected: " + jsonCheckResult.message);
                 return { type: "JSON", valid: false, error: jsonCheckResult };
@@ -1953,11 +1979,17 @@
             const detectedFormatDiv = document.getElementById("detectedFormatDiv");
             const formatIdentifier = document.getElementById("formatIdentifier");
             const formatValidity = document.getElementById("formatValidity");
+            const objectTreeContainer = document.getElementById("objectTree");
 
             if(detected == null) {
                 detectedFormatDiv.style.display = "none";
                 formatIdentifier.innerText = "";
                 formatValidity.innerText = "";
+
+                if(objectTreeContainer) {
+                    objectTreeContainer.style.display = 'none';
+                    objectTreeContainer.innerHTML = '';
+                }
                 return;
             }
 
@@ -1968,98 +2000,102 @@
                 formatIdentifier.classList.add("error-tag");
                 formatIdentifier.classList.remove("success-tag");
                 formatValidity.innerText = detected.error.message;
+
+                if(objectTreeContainer) {
+                    objectTreeContainer.style.display = 'none';
+                    objectTreeContainer.innerHTML = '';
+                }
             } else {
                 formatIdentifier.classList.remove("error-tag");
                 formatIdentifier.classList.add("success-tag");
                 formatValidity.innerText = "";
+
+                if (detected.type === "JSON" && objectTreeContainer) {
+                    objectTreeContainer.style.display = 'block';
+                    createObjectTreeView(detected.data, "objectTree", "JSON");
+                } else {
+                    if(objectTreeContainer) {
+                        objectTreeContainer.style.display = 'none';
+                        objectTreeContainer.innerHTML = '';
+                    }
+                }
             }
         }
 
         /**
-             * Renders a JavaScript object into a collapsible and expandable tree view.
-             * @param {object} data The JavaScript object to render.
-             * @param {string} containerElementId The ID of the container element to render the tree into.
-             */
-            function createObjectTreeView(data, containerElementId) {
-                const container = document.getElementById(containerElementId);
-                if (!container) {
-                    console.error(`Container element with ID "${containerElementId}" not found.`);
-                    return;
-                }
-                container.innerHTML = '';
-                container.classList.add('object-tree-container');
+         * Renders a JavaScript object into a collapsible and expandable tree view.
+         * @param {object} data The JavaScript object to render.
+         * @param {string} containerElementId The ID of the container element to render the tree into.
+         * @param {string} type The type of the object (e.g., "JSON").
+         */
+        function createObjectTreeView(data, containerElementId, type = "JSON") {
+            const container = document.getElementById(containerElementId);
+            if (!container) {
+                console.error(`Container element with ID "${containerElementId}" not found.`);
+                return;
+            }
+            container.innerHTML = '';
+            container.classList.add('object-tree-container');
 
-                // --- 1. Inject CSS Styles ---
-                const styleId = 'object-tree-styles';
-                if (!document.getElementById(styleId)) {
-                    const style = document.createElement('style');
-                    style.id = styleId;
-                    style.innerHTML = `
-                        .object-tree-container {
-                            font-family: Menlo, Monaco, 'Courier New', monospace;
-                            font-size: 14px;
-                            line-height: 1.5;
-                        }
-                        .node {
-                            margin-left: 2em;
-                            padding-left: 5px;
-                            border-left: 1px dotted #ccc;
-                        }
-                        .header, .primitive-node {
-                            display: flex;
-                            align-items: center;
-                        }
-                        .header {
-                            cursor: pointer;
-                        }
-                        .toggle {
-                            width: 1.5em;
-                            font-size: 0.8em;
-                            color: #666;
-                            transition: transform 0.1s ease;
-                        }
-                        .toggle.expanded {
-                            transform: rotate(90deg);
-                        }
-                        .key {
-                            font-weight: bold;
-                            color: #663399; /* rebeccapurple */
-                        }
-                        .value {
-                            margin-left: 0.5em;
-                        }
-                        .value.string { color: #d14; }
-                        .value.number { color: #099; }
-                        .value.boolean { color: #0000ff; }
-                        .value.null { color: #888; }
-                        .preview {
-                            margin-left: 0.5em;
-                            color: #888;
-                            font-style: italic;
-                        }
-                        .children {
-                            display: block;
-                        }
-                        .copy-btn {
-                            margin-left: auto;
-                            padding: 2px 8px;
-                            font-size: 12px;
-                            border: 1px solid #ccc;
-                            border-radius: 4px;
-                            background-color: #f0f0f0;
-                            cursor: pointer;
-                            visibility: hidden; /* Initially hidden */
-                        }
-                        .header:hover .copy-btn, .primitive-node:hover .copy-btn {
-                            visibility: visible; /* Show on hover */
-                        }
-                        .copy-btn:hover { background-color: #e0e0e0; }
-                        .copy-btn:active { background-color: #d0d0d0; }
-                    `;
-                    document.head.appendChild(style);
-                }
+            // --- Header ---
+            const title = document.createElement('div');
+            title.className = 'object-tree-title';
+            
+            const label = document.createElement('span');
+            label.textContent = 'Tree Viewer';
+            title.appendChild(label);
 
-            // --- 2. Helper to copy text and provide feedback ---
+            const typeTag = document.createElement('span');
+            typeTag.className = 'type-tag';
+            typeTag.textContent = type;
+            title.appendChild(typeTag);
+
+            const actions = document.createElement('div');
+            actions.className = 'tree-actions';
+
+            const expandAllBtn = document.createElement('button');
+            expandAllBtn.className = 'tree-action-btn';
+            expandAllBtn.textContent = 'Expand All';
+            expandAllBtn.onclick = () => {
+                const expandRecursive = (parent) => {
+                    const headers = parent.querySelectorAll('.header');
+                    headers.forEach(header => {
+                        const toggle = header.querySelector('.toggle');
+                        if (toggle && !toggle.classList.contains('expanded')) {
+                            header.click();
+                            // After clicking, children are rendered, so we recurse into the newly visible children
+                            const nextNode = header.closest('.node');
+                            const childrenContainer = nextNode.querySelector('.children');
+                            if (childrenContainer) {
+                                expandRecursive(childrenContainer);
+                            }
+                        }
+                    });
+                };
+                expandRecursive(container);
+            };
+
+            const collapseAllBtn = document.createElement('button');
+            collapseAllBtn.className = 'tree-action-btn';
+            collapseAllBtn.textContent = 'Collapse All';
+            collapseAllBtn.onclick = () => {
+                const headers = container.querySelectorAll('.header');
+                // Reverse order to collapse children before parents
+                Array.from(headers).reverse().forEach(header => {
+                    const toggle = header.querySelector('.toggle');
+                    if (toggle && toggle.classList.contains('expanded')) {
+                        header.click();
+                    }
+                });
+            };
+
+            actions.appendChild(expandAllBtn);
+            actions.appendChild(collapseAllBtn);
+            title.appendChild(actions);
+            
+            container.appendChild(title);
+
+            // --- Helper to copy text and provide feedback ---
             function copyToClipboard(text, button) {
                 navigator.clipboard.writeText(text).then(() => {
                     const originalText = button.textContent;
@@ -2074,130 +2110,366 @@
             }
 
             // --- 3. Recursive function to build the tree nodes ---
-            function buildNode(key, value) {
+            function buildNode(key, value, isRoot = false) {
                 const node = document.createElement('div');
                 node.className = 'node';
+                if (isRoot) {
+                    node.classList.add('root');
+                }
+
                 const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+                const styleType = type === 'boolean' ? (value ? 'boolean-true' : 'boolean-false') : type;
+                const isComplex = type === 'object' || type === 'array';
+                const isEmpty = (type === 'array' && value.length === 0) || (type === 'object' && value !== null && Object.keys(value).length === 0);
+                const isExpandable = isComplex && !isEmpty;
 
-                if (type === 'object' || type === 'array') {
-                    // --- Complex Node (Object or Array) ---
-                    const header = document.createElement('div');
-                    header.className = 'header';
+                const row = document.createElement('div');
+                row.className = isExpandable ? 'header' : 'primitive-node';
 
-                    const toggle = document.createElement('span');
-                    toggle.className = 'toggle expanded';
-                    toggle.textContent = '▸'; // Right-pointing triangle
+                // --- 1. Toggle Arrow ---
+                const toggle = document.createElement('span');
+                toggle.className = 'toggle';
+                if (isExpandable) {
+                    toggle.textContent = '▶';
+                } else {
+                    toggle.textContent = '▼'; // Keeps spacing consistent
+                    toggle.classList.add('hidden-visibility');
+                }
+                row.appendChild(toggle);
 
-                    const keySpan = document.createElement('span');
-                    keySpan.className = 'key';
-                    keySpan.textContent = `${key}: `;
+                // --- 2. Type Icon ---
+                const typeIcons = {
+                    'object': '{}',
+                    'array': '[]',
+                    'string': '“”',
+                    'number': '#',
+                    'boolean': value ? '✓' : '✗',
+                    'null': '∅'
+                };
+                const symbol = document.createElement('span');
+                symbol.className = `type-icon ${styleType}`;
+                symbol.textContent = typeIcons[type] || '';
+                row.appendChild(symbol);
 
-                    const preview = document.createElement('span');
-                    preview.className = 'preview';
-                    preview.textContent = type === 'array' ? `Array(${value.length})` : `Object`;
+                // --- 3. Key ---
+                const keySpan = document.createElement('span');
+                keySpan.className = `key ${styleType}`;
+                keySpan.textContent = `${key}: `;
+                row.appendChild(keySpan);
 
-                    const copyBtn = document.createElement('button');
-                    copyBtn.className = 'copy-btn';
-                    copyBtn.textContent = 'Copy JSON';
-                    copyBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        // For other formats, you could have a switch here
-                        // or pass the format as an argument.
-                        copyToClipboard(JSON.stringify(value, null, 2), copyBtn);
-                    };
-
-                    header.appendChild(toggle);
-                    header.appendChild(keySpan);
-                    header.appendChild(preview);
-                    header.appendChild(copyBtn);
-                    node.appendChild(header);
-
-                    const childrenContainer = document.createElement('div');
-                    childrenContainer.className = 'children';
-
-                    const entries = type === 'array' ? value.entries() : Object.entries(value);
-                    for (const [childKey, childValue] of entries) {
-                        childrenContainer.appendChild(buildNode(childKey, childValue));
+                // --- 4. Value / Preview ---
+                const contentSpan = document.createElement('span');
+                if (isComplex) {
+                    contentSpan.className = 'preview';
+                    if (type === 'array') {
+                        contentSpan.textContent = isEmpty ? 'Array(0)' : `Array(${value.length})`;
+                    } else {
+                        contentSpan.textContent = isEmpty ? 'Object (empty)' : 'Object';
                     }
+                } else {
+                    // Primitive Value
+                    contentSpan.className = `value ${styleType}`;
+                    const textContentSpan = document.createElement('span');
+                    contentSpan.appendChild(textContentSpan);
+
+                    const fullText = JSON.stringify(value);
+                    const maxLength = 1000;
+                    const isTruncated = fullText.length > maxLength;
+
+                    if (isTruncated) {
+                        textContentSpan.textContent = fullText.substring(0, maxLength);
+
+                        const ellipsis = document.createElement('span');
+                        ellipsis.className = 'ellipsis';
+                        ellipsis.textContent = "...";
+                        contentSpan.appendChild(ellipsis);
+
+                        const expandBtn = document.createElement('span');
+                        expandBtn.className = 'expand-btn';
+                        expandBtn.textContent = " (Show more)";
+                        expandBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            if (expandBtn.textContent === " (Show more)") {
+                                textContentSpan.textContent = fullText;
+                                ellipsis.classList.add('hidden-display');
+                                expandBtn.textContent = " (Show less)";
+                            } else {
+                                textContentSpan.textContent = fullText.substring(0, maxLength);
+                                ellipsis.classList.remove('hidden-display');
+                                expandBtn.textContent = " (Show more)";
+                            }
+                        };
+                        contentSpan.appendChild(expandBtn);
+                    } else {
+                        textContentSpan.textContent = fullText;
+                    }
+                }
+                row.appendChild(contentSpan);
+
+                // --- 5. Action Buttons ---
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'button button-xsmall node-action-btn';
+                copyBtn.textContent = isComplex ? 'Copy JSON' : 'Copy Value';
+                copyBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    copyToClipboard(JSON.stringify(value, null, 2), copyBtn);
+                };
+                row.appendChild(copyBtn);
+
+                const setBtn = document.createElement('button');
+                setBtn.className = 'button button-xsmall node-action-btn';
+                setBtn.textContent = 'Set';
+                setBtn.title = 'Set as main value';
+                setBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    getValueElement().value = JSON.stringify(value, null, 2);
+                    flashValue();
+                    fetchData();
+                };
+                row.appendChild(setBtn);
+
+                node.appendChild(row);
+
+                // --- 6. Children (Recursion) ---
+                if (isExpandable) {
+                    const childrenContainer = document.createElement('div');
+                    childrenContainer.className = 'children hidden-display';
                     node.appendChild(childrenContainer);
+
+                    let childrenBuilt = false;
 
                     // Toggle Logic
                     const toggleNode = () => {
                         const isExpanded = toggle.classList.toggle('expanded');
-                        childrenContainer.style.display = isExpanded ? 'block' : 'none';
+
+                        if (isExpanded && !childrenBuilt) {
+                            const entries = type === 'array' ? Array.from(value.entries()) : Object.entries(value);
+                            const CHUNK_SIZE = 100;
+                            let currentIndex = 0;
+
+                            const renderChunk = () => {
+                                const nextIndex = Math.min(currentIndex + CHUNK_SIZE, entries.length);
+                                for (let i = currentIndex; i < nextIndex; i++) {
+                                    const [childKey, childValue] = entries[i];
+                                    childrenContainer.appendChild(buildNode(childKey, childValue));
+                                }
+                                currentIndex = nextIndex;
+
+                                if (currentIndex < entries.length) {
+                                    const loadMore = document.createElement('div');
+                                    loadMore.className = 'node header load-more';
+                                    loadMore.textContent = `... Show more items (${entries.length - currentIndex} remaining)`;
+                                    loadMore.onclick = (e) => {
+                                        e.stopPropagation();
+                                        childrenContainer.removeChild(loadMore);
+                                        renderChunk();
+                                    };
+                                    childrenContainer.appendChild(loadMore);
+                                }
+                            };
+
+                            renderChunk();
+                            childrenBuilt = true;
+                        }
+
+                        toggle.textContent = isExpanded ? '▼' : '▶';
+                        if (isExpanded) {
+                            childrenContainer.classList.remove('hidden-display');
+                        } else {
+                            childrenContainer.classList.add('hidden-display');
+                        }
                     };
-                    header.onclick = toggleNode;
-
-                    // Start collapsed
-                    toggleNode();
-
-                } else {
-                    // --- Primitive Node ---
-                    node.classList.add('primitive-node');
-
-                    const keySpan = document.createElement('span');
-                    keySpan.className = 'key';
-                    keySpan.textContent = `${key}: `;
-
-                    const valueSpan = document.createElement('span');
-                    valueSpan.className = `value ${type}`;
-                    // Use JSON.stringify to correctly represent strings (with quotes) vs other primitives
-                    valueSpan.textContent = JSON.stringify(value);
-
-                    const copyBtn = document.createElement('button');
-                    copyBtn.className = 'copy-btn';
-                    copyBtn.textContent = 'Copy Value';
-                    copyBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        copyToClipboard(JSON.stringify(value), copyBtn);
-                    };
-
-                    node.appendChild(keySpan);
-                    node.appendChild(valueSpan);
-                    node.appendChild(copyBtn);
+                    row.onclick = toggleNode;
                 }
 
                 return node;
             }
 
             // --- 4. Build and append the root node ---
-            const rootNode = buildNode('root', data);
+            const rootNode = buildNode('root', data, true);
             container.appendChild(rootNode);
         }
 
-        // --- Example Usage ---
-        const sampleObject = {
-            id: "001",
-            type: "donut",
-            name: "Cake",
-            ppu: 0.55,
-            isPublished: true,
-            author: null,
-            batters: {
-                batter: [
-                    { id: "1001", type: "Regular" },
-                    { id: "1002", type: "Chocolate" },
-                    { id: "1003", type: "Blueberry" },
-                    { id: "1004", type: "Devil's Food" }
-                ]
-            },
-            topping: [
-                { id: "5001", type: "None" },
-                { id: "5002", type: "Glazed" },
-                { id: "5005", type: "Sugar" },
-                { id: "5007", type: "Powdered Sugar" },
-                { id: "5006", type: "Chocolate with Sprinkles" },
-                { id: "5003", type: "Chocolate" },
-                { id: "5004", type: "Maple" }
-            ]
-        };
-
-        // Render the object in the 'object-container' div when the page loads.
-        //window.onload = () => {
-        //    createObjectTreeView(sampleObject, 'object-container');
-        //};
-
     </script>
+    <!-- Object Tree View Styles -->
+    <style>
+        .object-tree-container {
+            font-family: Menlo, Monaco, 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            background-color: #242424;
+            color: silver;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            margin-top: 10px;
+        }
+        .node {
+            margin-left: 2em;
+            padding-left: 5px;
+            border-left: 1px dotted #555;
+        }
+        .node.root {
+            margin-left: 0;
+            padding-left: 0;
+            border-left: none;
+        }
+        .header, .primitive-node {
+            display: flex;
+            align-items: center;
+            padding: 2px 4px;
+            transition: background-color 0.1s ease;
+            border-radius: 2px;
+            min-width: 0; /* Allow flex children to shrink */
+        }
+        .header:hover, .primitive-node:hover {
+            background-color: #3e3e3e;
+        }
+        .header {
+            cursor: pointer;
+        }
+        .toggle {
+            width: 1.5em;
+            text-align: center;
+            font-size: 0.8em;
+            color: #aaa;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .toggle.hidden-visibility {
+            visibility: hidden;
+        }
+        .type-icon {
+            width: 1.8em;
+            text-align: center;
+            margin-right: 8px;
+            font-weight: bold;
+            font-size: 0.8em;
+            flex-shrink: 0;
+            user-select: none;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+            line-height: 1.6;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .key {
+            font-weight: bold;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+        .value {
+            margin-left: 0.5em;
+            overflow-wrap: anywhere;
+            word-break: break-all;
+            min-width: 0;
+            flex-grow: 1;
+        }
+        /* Type-specific colors */
+        .object { color: #d2a8ff; }
+        .array { color: #ffa657; }
+        .string { color: #a5d6ff; }
+        .number { color: #79c0ff; }
+        .boolean-true { color: #56d364; }
+        .boolean-false { color: #ff7b72; }
+        .null { color: #6e7681; }
+
+        .preview {
+            margin-left: 0.5em;
+            color: #8b949e;
+            font-style: italic;
+            flex-shrink: 0;
+        }
+        .children {
+            display: block;
+        }
+        .children.hidden-display {
+            display: none;
+        }
+        .node-action-btn {
+            margin-left: 10px;
+            width: auto;
+            visibility: hidden;
+            flex-shrink: 0;
+        }
+        .header:hover .node-action-btn, .primitive-node:hover .node-action-btn {
+            visibility: visible;
+        }
+
+        .object-tree-title {
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #808080;
+            font-family: sans-serif;
+            font-size: 0.9rem;
+            position: sticky;
+            top: 0;
+            background-color: #242424;
+            z-index: 10;
+            padding-top: 5px;
+        }
+
+        .type-tag {
+            background-color: #444;
+            color: #ccc;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            margin-left: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tree-actions {
+            margin-left: auto;
+            display: flex;
+            gap: 10px;
+        }
+
+        .tree-action-btn {
+            background: none;
+            border: 1px solid #444;
+            color: #808080;
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .tree-action-btn:hover {
+            background-color: #444;
+            color: #ccc;
+            border-color: #555;
+        }
+
+        .ellipsis {
+            color: orange;
+            font-weight: bold;
+            user-select: none;
+        }
+
+        .expand-btn {
+            cursor: pointer;
+            color: #d2a8ff;
+            font-size: 0.9em;
+            margin-left: 5px;
+            user-select: none;
+        }
+
+        .load-more {
+            color: #d2a8ff;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .hidden-display {
+            display: none !important;
+        }
+    </style>
 </head>
 
 <body>
@@ -2500,8 +2772,7 @@
         <!-- ...Preview... TODO [Set] [Insert] [Remove] -->
     </div>
     
-
-    <!--TODO add json tree viewer-->
+    <div id="objectTree" style="display: none;"></div>
     
 </body>
 

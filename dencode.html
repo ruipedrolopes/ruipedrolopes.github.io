@@ -1975,6 +1975,228 @@
             }
         }
 
+        /**
+             * Renders a JavaScript object into a collapsible and expandable tree view.
+             * @param {object} data The JavaScript object to render.
+             * @param {string} containerElementId The ID of the container element to render the tree into.
+             */
+            function createObjectTreeView(data, containerElementId) {
+                const container = document.getElementById(containerElementId);
+                if (!container) {
+                    console.error(`Container element with ID "${containerElementId}" not found.`);
+                    return;
+                }
+                container.innerHTML = '';
+                container.classList.add('object-tree-container');
+
+                // --- 1. Inject CSS Styles ---
+                const styleId = 'object-tree-styles';
+                if (!document.getElementById(styleId)) {
+                    const style = document.createElement('style');
+                    style.id = styleId;
+                    style.innerHTML = `
+                        .object-tree-container {
+                            font-family: Menlo, Monaco, 'Courier New', monospace;
+                            font-size: 14px;
+                            line-height: 1.5;
+                        }
+                        .node {
+                            margin-left: 2em;
+                            padding-left: 5px;
+                            border-left: 1px dotted #ccc;
+                        }
+                        .header, .primitive-node {
+                            display: flex;
+                            align-items: center;
+                        }
+                        .header {
+                            cursor: pointer;
+                        }
+                        .toggle {
+                            width: 1.5em;
+                            font-size: 0.8em;
+                            color: #666;
+                            transition: transform 0.1s ease;
+                        }
+                        .toggle.expanded {
+                            transform: rotate(90deg);
+                        }
+                        .key {
+                            font-weight: bold;
+                            color: #663399; /* rebeccapurple */
+                        }
+                        .value {
+                            margin-left: 0.5em;
+                        }
+                        .value.string { color: #d14; }
+                        .value.number { color: #099; }
+                        .value.boolean { color: #0000ff; }
+                        .value.null { color: #888; }
+                        .preview {
+                            margin-left: 0.5em;
+                            color: #888;
+                            font-style: italic;
+                        }
+                        .children {
+                            display: block;
+                        }
+                        .copy-btn {
+                            margin-left: auto;
+                            padding: 2px 8px;
+                            font-size: 12px;
+                            border: 1px solid #ccc;
+                            border-radius: 4px;
+                            background-color: #f0f0f0;
+                            cursor: pointer;
+                            visibility: hidden; /* Initially hidden */
+                        }
+                        .header:hover .copy-btn, .primitive-node:hover .copy-btn {
+                            visibility: visible; /* Show on hover */
+                        }
+                        .copy-btn:hover { background-color: #e0e0e0; }
+                        .copy-btn:active { background-color: #d0d0d0; }
+                    `;
+                    document.head.appendChild(style);
+                }
+
+            // --- 2. Helper to copy text and provide feedback ---
+            function copyToClipboard(text, button) {
+                navigator.clipboard.writeText(text).then(() => {
+                    const originalText = button.textContent;
+                    button.textContent = 'Copied!';
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                    }, 1500);
+                }).catch(err => {
+                    console.error('Failed to copy: ', err);
+                    alert('Failed to copy text.');
+                });
+            }
+
+            // --- 3. Recursive function to build the tree nodes ---
+            function buildNode(key, value) {
+                const node = document.createElement('div');
+                node.className = 'node';
+                const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+
+                if (type === 'object' || type === 'array') {
+                    // --- Complex Node (Object or Array) ---
+                    const header = document.createElement('div');
+                    header.className = 'header';
+
+                    const toggle = document.createElement('span');
+                    toggle.className = 'toggle expanded';
+                    toggle.textContent = '▸'; // Right-pointing triangle
+
+                    const keySpan = document.createElement('span');
+                    keySpan.className = 'key';
+                    keySpan.textContent = `${key}: `;
+
+                    const preview = document.createElement('span');
+                    preview.className = 'preview';
+                    preview.textContent = type === 'array' ? `Array(${value.length})` : `Object`;
+
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'copy-btn';
+                    copyBtn.textContent = 'Copy JSON';
+                    copyBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        // For other formats, you could have a switch here
+                        // or pass the format as an argument.
+                        copyToClipboard(JSON.stringify(value, null, 2), copyBtn);
+                    };
+
+                    header.appendChild(toggle);
+                    header.appendChild(keySpan);
+                    header.appendChild(preview);
+                    header.appendChild(copyBtn);
+                    node.appendChild(header);
+
+                    const childrenContainer = document.createElement('div');
+                    childrenContainer.className = 'children';
+
+                    const entries = type === 'array' ? value.entries() : Object.entries(value);
+                    for (const [childKey, childValue] of entries) {
+                        childrenContainer.appendChild(buildNode(childKey, childValue));
+                    }
+                    node.appendChild(childrenContainer);
+
+                    // Toggle Logic
+                    const toggleNode = () => {
+                        const isExpanded = toggle.classList.toggle('expanded');
+                        childrenContainer.style.display = isExpanded ? 'block' : 'none';
+                    };
+                    header.onclick = toggleNode;
+
+                    // Start collapsed
+                    toggleNode();
+
+                } else {
+                    // --- Primitive Node ---
+                    node.classList.add('primitive-node');
+
+                    const keySpan = document.createElement('span');
+                    keySpan.className = 'key';
+                    keySpan.textContent = `${key}: `;
+
+                    const valueSpan = document.createElement('span');
+                    valueSpan.className = `value ${type}`;
+                    // Use JSON.stringify to correctly represent strings (with quotes) vs other primitives
+                    valueSpan.textContent = JSON.stringify(value);
+
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'copy-btn';
+                    copyBtn.textContent = 'Copy Value';
+                    copyBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        copyToClipboard(JSON.stringify(value), copyBtn);
+                    };
+
+                    node.appendChild(keySpan);
+                    node.appendChild(valueSpan);
+                    node.appendChild(copyBtn);
+                }
+
+                return node;
+            }
+
+            // --- 4. Build and append the root node ---
+            const rootNode = buildNode('root', data);
+            container.appendChild(rootNode);
+        }
+
+        // --- Example Usage ---
+        const sampleObject = {
+            id: "001",
+            type: "donut",
+            name: "Cake",
+            ppu: 0.55,
+            isPublished: true,
+            author: null,
+            batters: {
+                batter: [
+                    { id: "1001", type: "Regular" },
+                    { id: "1002", type: "Chocolate" },
+                    { id: "1003", type: "Blueberry" },
+                    { id: "1004", type: "Devil's Food" }
+                ]
+            },
+            topping: [
+                { id: "5001", type: "None" },
+                { id: "5002", type: "Glazed" },
+                { id: "5005", type: "Sugar" },
+                { id: "5007", type: "Powdered Sugar" },
+                { id: "5006", type: "Chocolate with Sprinkles" },
+                { id: "5003", type: "Chocolate" },
+                { id: "5004", type: "Maple" }
+            ]
+        };
+
+        // Render the object in the 'object-container' div when the page loads.
+        //window.onload = () => {
+        //    createObjectTreeView(sampleObject, 'object-container');
+        //};
+
     </script>
 </head>
 

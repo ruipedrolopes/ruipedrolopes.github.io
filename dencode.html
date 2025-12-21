@@ -2474,20 +2474,16 @@
 
 <body>
     <textarea id="value" value="" placeholder="Text goes here..." autofocus ondrop="dropHandler(event);" spellcheck="false"></textarea>
-    <div style="float: right;position: relative;font-size: small; margin-top: 0.2rem">
-        Line: <span id="line"></span>
-        <span style="margin-left: 10px;">Column: </span><span id="col"></span>
-    </div>
-    <div style="float: right;clear: right;position: relative;font-size: small;">
-        Start: <span id="start"></span>
-        <span style="margin-left: 10px;">End: </span><span id="end"></span>
-        <span style="margin-left: 10px;">Selection: </span><span id="selection"></span>
-        <span style="margin-left: 10px;">Length:</span><span id="length"></span>
+    <div style="float: right; position: relative; font-size: small; margin-top: 0.2rem; display: grid; grid-template-columns: 1fr 1fr; column-gap: 0.5rem; row-gap: 0.1rem; text-align: end;" >
+        <div>Line: <span id="line"></span></div><div>Column: </span><span id="col"></span></div>
+        <div>Start: <span id="start"></span></div><div>End: <span id="end"></span></div>
+        <div>Selection: <span id="selection"></span></div><div>Length: <span id="length"></span></div>
     </div>
     <div style="float: right; clear: right; position: relative; font-size: small; padding-top: 0.3rem; text-align: end; display: none" id="detectedFormatDiv">
         <span id="formatIdentifier" class="error-tag" style="display: block; float: right;"></span>
         <span id="formatValidity" style="color: orange; padding-top: 0.2rem; display: block; clear: right; max-width: 25rem;"></span>
     </div>
+
     <div>
         <!--TODO review/improve url and html encoders-->
         <div class="buttonGroup">

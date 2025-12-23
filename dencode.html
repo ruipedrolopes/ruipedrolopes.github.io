@@ -829,8 +829,172 @@
                 return false;
             },
 
+            objectToYaml: function(obj, indentLevel, paddingChar) {
+                indentLevel = indentLevel || 0;
+                paddingChar = paddingChar || '  ';
+                const indent = paddingChar.repeat(indentLevel);
+                
+                if (obj === null) return 'null';
+                if (typeof obj === 'undefined') return '';
+                if (typeof obj !== 'object') {
+                    if (typeof obj === 'string') {
+                         if (obj.includes(':') || obj.includes('#') || obj.trim().length !== obj.length || !isNaN(Number(obj)) || obj === "true" || obj === "false" || obj === "null" || obj === "[]" || obj === "{}") {
+                             return JSON.stringify(obj);
+                         }
+                    }
+                    return String(obj);
+                }
+                
+                if (obj instanceof Date) return obj.toISOString();
+
+                let yaml = '';
+                
+                if (Array.isArray(obj)) {
+                    if (obj.length === 0) return '[]';
+                    obj.forEach(item => {
+                        const itemStr = auxiliary.objectToYaml(item, indentLevel + 1, paddingChar);
+                        if (itemStr.includes('\n') && (typeof item === 'object' && item !== null && !Array.isArray(item))) {
+                             const trimmedItem = itemStr.trimStart();
+                             yaml += `${indent}- ${trimmedItem}\n`;
+                        } else {
+                             if (itemStr.includes('\n')) {
+                                 yaml += `${indent}- \n${itemStr}\n`;
+                             } else {
+                                 yaml += `${indent}- ${itemStr.trim()}\n`;
+                             }
+                        }
+                    });
+                } else {
+                    if (Object.keys(obj).length === 0) return '{}';
+                    for (const [key, value] of Object.entries(obj)) {
+                        const valStr = auxiliary.objectToYaml(value, indentLevel + 1, paddingChar);
+                        
+                        const isComplex = typeof value === 'object' && value !== null && !(value instanceof Date);
+                        const isEmpty = isComplex && (Array.isArray(value) ? value.length === 0 : Object.keys(value).length === 0);
+                        
+                        if (isComplex && !isEmpty) {
+                            yaml += `${indent}${key}:\n${valStr}\n`;
+                        } else {
+                            yaml += `${indent}${key}: ${valStr.trim()}\n`;
+                        }
+                    }
+                }
+                return yaml.trimEnd();
+            },
+
             yamlToObject: function(str) {
-                //TODO
+                if (!str || !str.trim()) throw new Error("Empty string");
+
+                const linesArr = str.split(/\r?\n/);
+
+                const parseScalar = (v) => {
+                    v = v.trim();
+                    if (v === 'true') return true;
+                    if (v === 'false') return false;
+                    if (v === 'null') return null;
+                    if (v === '') return null;
+                    if (v === '[]') return [];
+                    if (v === '{}') return {};
+                    
+                    // Try to parse flow-style arrays/objects as JSON
+                    if ((v.startsWith('[') && v.endsWith(']')) || (v.startsWith('{') && v.endsWith('}'))) {
+                        try {
+                            return JSON.parse(v);
+                        } catch (e) {
+                            // If JSON parse fails (e.g. [a, b] without quotes), fall through to string/number
+                        }
+                    }
+
+                    const num = Number(v);
+                    if (!isNaN(num) && v.trim() !== "") return num;
+                    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) return v.slice(1, -1);
+                    return v;
+                };
+
+                function parseBlock(startIdx, minIndent) {
+                    let result = null;
+                    let i = startIdx;
+
+                    while (i < linesArr.length) {
+                        const line = linesArr[i];
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed.startsWith('#')) { i++; continue; }
+
+                        const indent = line.search(/\S/);
+                        if (indent < minIndent) break;
+
+                        if (trimmed.startsWith('-')) {
+                            if (result === null) result = [];
+                            if (!Array.isArray(result)) { i++; continue; }
+
+                            const content = trimmed.substring(1).trim();
+                            if (!content) {
+                                const sub = parseBlock(i + 1, indent + 1);
+                                result.push(sub.data);
+                                i = sub.nextIdx;
+                            } else {
+                                const kv = content.match(/^([^:]+):\s*(.*)$/);
+                                if (kv) {
+                                    let obj = {};
+                                    const k = kv[1].trim();
+                                    const v = kv[2].trim();
+                                    obj[k] = v ? parseScalar(v) : null;
+
+                                    const keyIndent = indent + 2;
+                                    i++;
+
+                                    while (i < linesArr.length) {
+                                        const nextLine = linesArr[i];
+                                        const nextTrimmed = nextLine.trim();
+                                        if (!nextTrimmed || nextTrimmed.startsWith('#')) { i++; continue; }
+
+                                        const nextIndent = nextLine.search(/\S/);
+                                        if (nextIndent < keyIndent) break;
+                                        if (nextTrimmed.startsWith('-')) break;
+
+                                        const nextKv = nextTrimmed.match(/^([^:]+):\s*(.*)$/);
+                                        if (nextKv) {
+                                            const nk = nextKv[1].trim();
+                                            const nv = nextKv[2].trim();
+                                            obj[nk] = nv ? parseScalar(nv) : null;
+                                            i++;
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                    result.push(obj);
+                                } else {
+                                    result.push(parseScalar(content));
+                                    i++;
+                                }
+                            }
+                        } else {
+                            if (result === null) result = {};
+                            if (Array.isArray(result)) { i++; continue; }
+
+                            const kv = trimmed.match(/^([^:]+):\s*(.*)$/);
+                            if (kv) {
+                                const key = kv[1].trim();
+                                const valStr = kv[2].trim();
+
+                                if (!valStr) {
+                                    const sub = parseBlock(i + 1, indent + 1);
+                                    result[key] = sub.data;
+                                    i = sub.nextIdx;
+                                } else {
+                                    result[key] = parseScalar(valStr);
+                                    i++;
+                                }
+                            } else {
+                                i++;
+                            }
+                        }
+                    }
+                    return { data: result, nextIdx: i };
+                }
+
+                const parsedResult = parseBlock(0, 0);
+                return parsedResult.data || {};
             }
         };
 
@@ -1331,6 +1495,8 @@
                             return JSON.stringify(JSON.parse(value), null, padding);
                         case "XML":
                             return formatXml(value, true, padding);
+                        case "YAML":
+                            return auxiliary.objectToYaml(auxiliary.yamlToObject(value), 0, padding);
                         default:
                             console.error("Unsupported formatting lang");
                             return -1;
@@ -1344,6 +1510,10 @@
                             return JSON.stringify(JSON.parse(value));
                         case "XML":
                             return formatXml(value, false);
+                        case "YAML":
+                            // YAML minification isn't standard like JSON/XML.
+                            // We return a "clean" block-style version (normalized, no comments).
+                            return auxiliary.objectToYaml(auxiliary.yamlToObject(value), 0, "  ");
                         default:
                             console.error("Unsupported formatting lang");
                             return -1;
@@ -1772,9 +1942,15 @@
                 return { type: "XML", valid: false, error: xmlCheckResult };
             }
 
-            // Check for YAML (boolean return)
+            // Check for YAML (three-state return)
             if (auxiliary.isYaml(value) === true) {
-                return { type: "YAML", valid: true };
+                try {
+                    const data = auxiliary.yamlToObject(value);
+                    return { type: "YAML", valid: true, data: data };
+                } catch (e) {
+                    console.error("Malformed YAML detected: " + e.message);
+                    return { type: "YAML", valid: false, error: e };
+                }
             }
             
             // Check for Base64 (boolean return)
@@ -1980,11 +2156,13 @@
             const formatIdentifier = document.getElementById("formatIdentifier");
             const formatValidity = document.getElementById("formatValidity");
             const objectTreeContainer = document.getElementById("objectTree");
+            const formattingLangSelect = document.getElementById("formattingLang");
 
             if(detected == null) {
                 detectedFormatDiv.style.display = "none";
                 formatIdentifier.innerText = "";
                 formatValidity.innerText = "";
+                formattingLangSelect.value = "JSON";
 
                 if(objectTreeContainer) {
                     objectTreeContainer.style.display = 'none';
@@ -2000,6 +2178,7 @@
                 formatIdentifier.classList.add("error-tag");
                 formatIdentifier.classList.remove("success-tag");
                 formatValidity.innerText = detected.error.message;
+                formattingLangSelect.value = "JSON";
 
                 if(objectTreeContainer) {
                     objectTreeContainer.style.display = 'none';
@@ -2010,9 +2189,22 @@
                 formatIdentifier.classList.add("success-tag");
                 formatValidity.innerText = "";
 
-                if (detected.type === "JSON" && objectTreeContainer) {
+                if (["JSON", "XML", "YAML"].includes(detected.type)) {
+                    formattingLangSelect.value = detected.type;
+                } else {
+                    formattingLangSelect.value = "JSON";
+                }
+
+                if ((detected.type === "JSON" || detected.type === "YAML") && objectTreeContainer) {
                     objectTreeContainer.style.display = 'block';
-                    createObjectTreeView(detected.data, "objectTree", "JSON");
+                    createObjectTreeView(detected.data, "objectTree", detected.type);
+
+                    if (detected.type === "YAML") {
+                        const rawValue = getValueElement().value;
+                        if (/(?:^|\s)[&*][a-zA-Z0-9_-]+/m.test(rawValue)) {
+                            formatValidity.innerText = "Note: YAML anchors/aliases (&/*) detected but not supported (treated as strings).";
+                        }
+                    }
                 } else {
                     if(objectTreeContainer) {
                         objectTreeContainer.style.display = 'none';
@@ -2207,26 +2399,86 @@
                 row.appendChild(contentSpan);
 
                 // --- 5. Action Buttons ---
-                const copyBtn = document.createElement('button');
-                copyBtn.className = 'button button-xsmall node-action-btn';
-                copyBtn.textContent = isComplex ? 'Copy JSON' : 'Copy Value';
-                copyBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    copyToClipboard(JSON.stringify(value, null, 2), copyBtn);
-                };
-                row.appendChild(copyBtn);
+                const buttonsContainer = document.createElement('div');
+                buttonsContainer.className = 'node-buttons';
 
-                const setBtn = document.createElement('button');
-                setBtn.className = 'button button-xsmall node-action-btn';
-                setBtn.textContent = 'Set';
-                setBtn.title = 'Set as main value';
-                setBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    getValueElement().value = JSON.stringify(value, null, 2);
-                    flashValue();
-                    fetchData();
-                };
-                row.appendChild(setBtn);
+                if (isComplex) {
+                    // Copy JSON
+                    const copyJsonBtn = document.createElement('button');
+                    copyJsonBtn.className = 'button button-xsmall node-action-btn';
+                    copyJsonBtn.textContent = 'Copy JSON';
+                    copyJsonBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        copyToClipboard(JSON.stringify(value, null, formatWhitepacePadding()), copyJsonBtn);
+                    };
+                    buttonsContainer.appendChild(copyJsonBtn);
+
+                    // Copy YAML
+                    const copyYamlBtn = document.createElement('button');
+                    copyYamlBtn.className = 'button button-xsmall node-action-btn';
+                    copyYamlBtn.textContent = 'Copy YAML';
+                    copyYamlBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        copyToClipboard(auxiliary.objectToYaml(value, 0, formatWhitepacePadding()), copyYamlBtn);
+                    };
+                    buttonsContainer.appendChild(copyYamlBtn);
+
+                    // Apply JSON
+                    const setJsonBtn = document.createElement('button');
+                    setJsonBtn.className = 'button button-xsmall node-action-btn';
+                    setJsonBtn.textContent = 'Apply JSON';
+                    setJsonBtn.title = 'Replace main text with this JSON';
+                    setJsonBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        getValueElement().value = JSON.stringify(value, null, formatWhitepacePadding());
+                        flashValue();
+                        fetchData();
+                        const detected = detectFormatOrLanguage();
+                        updateDetectedFormatDisplay(detected);
+                    };
+                    buttonsContainer.appendChild(setJsonBtn);
+
+                    // Apply YAML
+                    const setYamlBtn = document.createElement('button');
+                    setYamlBtn.className = 'button button-xsmall node-action-btn';
+                    setYamlBtn.textContent = 'Apply YAML';
+                    setYamlBtn.title = 'Replace main text with this YAML';
+                    setYamlBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        getValueElement().value = auxiliary.objectToYaml(value, 0, formatWhitepacePadding());
+                        flashValue();
+                        fetchData();
+                        const detected = detectFormatOrLanguage();
+                        updateDetectedFormatDisplay(detected);
+                    };
+                    buttonsContainer.appendChild(setYamlBtn);
+                } else {
+                    // Primitive Value Actions
+                    const copyValBtn = document.createElement('button');
+                    copyValBtn.className = 'button button-xsmall node-action-btn';
+                    copyValBtn.textContent = 'Copy Value';
+                    copyValBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        copyToClipboard(typeof value === 'string' ? value : JSON.stringify(value), copyValBtn);
+                    };
+                    buttonsContainer.appendChild(copyValBtn);
+
+                    const setValBtn = document.createElement('button');
+                    setValBtn.className = 'button button-xsmall node-action-btn';
+                    setValBtn.textContent = 'Apply Value';
+                    setValBtn.title = 'Replace main text with this value';
+                    setValBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        getValueElement().value = typeof value === 'string' ? value : JSON.stringify(value);
+                        flashValue();
+                        fetchData();
+                        const detected = detectFormatOrLanguage();
+                        updateDetectedFormatDisplay(detected);
+                    };
+                    buttonsContainer.appendChild(setValBtn);
+                }
+
+                row.appendChild(buttonsContainer);
 
                 node.appendChild(row);
 
@@ -2385,11 +2637,16 @@
         .children.hidden-display {
             display: none;
         }
+        .node-buttons {
+            display: flex;
+            gap: 5px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
         .node-action-btn {
-            margin-left: 10px;
             width: auto;
             visibility: hidden;
-            flex-shrink: 0;
+            white-space: nowrap;
         }
         .header:hover .node-action-btn, .primitive-node:hover .node-action-btn {
             visibility: visible;
@@ -2540,7 +2797,7 @@
                 <option value="XML">
                     XML
                 </option>
-                <option value="YAML" disabled>
+                <option value="YAML">
                     YAML
                 </option>
             </select><br/>

@@ -137,7 +137,7 @@
             margin-top: 16px;
         }
 
-        .slider {
+        .slider, .off-on-slider {
             position: absolute;
             cursor: pointer;
             top: 0;
@@ -145,100 +145,96 @@
             right: 0;
             bottom: 0;
             background-color: #ccc;
-            -webkit-transition: .4s;
             transition: .4s;
+        }
+
+        .slider {
             text-align: center;
         }
 
-        .slider-copy:after {
-            content: "Transform";
-        }
-
-        input:checked+.slider-copy:after {
-            content: "Copy";
-        }
-
-        .slider-padding:after {
-            content: "Spaces";
-        }
-
-        input:checked+.slider-padding:after {
-            content: "Tabs";
-        }
-
-        .slider-selection:after {
-            content: "All text";
-        }
-
-        input:checked+.slider-selection:after {
-            content: "Selection";
-        }
-        
-        .slider-sort:after {
-            content: "Asc.";
-        }
-
-        input:checked+.slider-sort:after {
-            content: "Desc.";
-        }
-
-        .slider-wrap:after {
-            content: "Wrap";
-        }
-
-        input:checked+.slider-wrap:after {
-            content: "No wrap";
-        }
-
-        .slider:after {
+        .slider:after, .off-on-slider:after {
             line-height: 30px;
         }
 
-        .slider:before {
+        .off-on-slider:after {
+            line-height: 20px;
+        }
+
+        .slider:before, .off-on-slider:before {
             position: absolute;
             content: "";
+            background-color: white;
+            transition: .4s;
+        }
+
+        .slider:before {
             height: 22px;
             width: 22px;
             left: 4px;
             bottom: 4px;
-            background-color: white;
-            -webkit-transition: .4s;
-            transition: .4s;
-            box-shadow: 2px 2px 8px 1px #434343ba
+            box-shadow: 2px 2px 8px 1px #434343ba;
         }
 
-        input:checked+.slider {
+        .off-on-slider:before {
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            box-shadow: 1px 1px 3px 1px #434343ba;
+        }
+
+        input:checked+.slider, input:checked+.off-on-slider {
             background-color: #2196F3;
         }
 
-        input:focus+.slider {
+        input:focus+.slider, input:focus+.off-on-slider {
             box-shadow: 0 0 1px #2196F3;
         }
 
         input:checked+.slider:before {
-            -webkit-transform: translateX(90px);
-            -ms-transform: translateX(90px);
             transform: translateX(90px);
         }
 
-        /* Rounded sliders */
-        .slider.round {
+        input:checked+.off-on-slider:before {
+            transform: translateX(20px);
+        }
+
+        .slider.round, .off-on-slider.round {
             border-radius: 30px;
         }
 
-        .slider.round:before {
+        .off-on-slider.round {
+            border-radius: 10px;
+        }
+
+        .slider.round:before, .off-on-slider.round:before {
             border-radius: 50%;
         }
 
-        .button {
+        .slider-copy:after { content: "Transform"; }
+        input:checked+.slider-copy:after { content: "Copy"; }
+
+        .slider-padding:after { content: "Spaces"; }
+        input:checked+.slider-padding:after { content: "Tabs"; }
+
+        .slider-selection:after { content: "All text"; }
+        input:checked+.slider-selection:after { content: "Selection"; }
+        
+        .slider-sort:after { content: "Asc."; }
+        input:checked+.slider-sort:after { content: "Desc."; }
+
+        .slider-wrap:after { content: "Wrap"; }
+        input:checked+.slider-wrap:after { content: "No wrap"; }
+
+        .button, .buttonGroup > input[type=button], .buttonGroup > select {
             background-color: #ccc;
             border: 2px solid #7c7c7c;
             color: #000000;
-            padding: 6px 22px;
+            padding: 2px 6px;
             text-align: center;
             text-decoration: none;
             display: inline-block;
-            font-size: 16px;
+            font-size: 14px;
             margin: 4px 2px;
             transition-duration: 0.4s;
             cursor: pointer;
@@ -246,21 +242,21 @@
             width: 100%;
         }
 
-        .button:hover {
+        .button:hover, .buttonGroup > input[type=button]:hover, .buttonGroup > select:hover {
             background-color: #4d4d4d;
             border: 2px solid #c5c5c5;
             color: white;
         }
 
-        .button:active {
+        .button:active, .buttonGroup > input[type=button]:active, .buttonGroup > select:active {
             background-color: #2196F3;
             border: 2px solid #7c7c7c;
             color: #000000;
         }
 
-        .button-xsmall {
-            padding: 2px 6px;
-            font-size: 14px;
+        .button-large {
+            padding: 6px 22px;
+            font-size: 16px;
         }
 
         .button.round {
@@ -268,7 +264,6 @@
             margin: 0;
             padding: 5px 22px;
             border-radius: 30px;
-            font-size: 14px;
         }
 
         select:active {
@@ -286,64 +281,6 @@
             position: relative;
             display: inline-block;
             margin: 5px 0;
-        }
-
-        .off-on-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            -webkit-transition: .4s;
-            transition: .4s;
-        }
-
-        .off-on input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-            margin-top: 16px;
-        }
-
-        .off-on-slider:after {
-            line-height: 20px;
-        }
-
-        .off-on-slider:before {
-            position: absolute;
-            content: "";
-            height: 14px;
-            width: 14px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            -webkit-transition: .4s;
-            transition: .4s;
-            box-shadow: 1px 1px 3px 1px #434343ba
-        }
-
-        input:checked+.off-on-slider {
-            background-color: #2196F3;
-        }
-
-        input:focus+.off-on-slider {
-            box-shadow: 0 0 1px #2196F3;
-        }
-
-        input:checked+.off-on-slider:before {
-            -webkit-transform: translateX(20px);
-            -ms-transform: translateX(20px);
-            transform: translateX(20px);
-        }
-
-        .off-on-slider.round {
-            border-radius: 10px;
-        }
-
-        .off-on-slider.round:before {
-            border-radius: 50%;
         }
 
         .off-on+label {
@@ -423,11 +360,53 @@
             border: none;
             background: transparent;
         }
+
+        .success-tag {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: greenyellow;
+            color: black;
+            font-weight: 600;
+            padding: 0.1rem;
+            border-radius: 0.2rem;
+        }
+
+        .error-tag {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: tomato;
+            color: black;
+            font-weight: 600;
+            padding: 0.1rem;
+            border-radius: 0.2rem;
+        }
+
     </style>
     <script type="text/javascript">
 
+        const el = (tag, props = {}, ...children) => {
+            const e = document.createElement(tag);
+            Object.entries(props).forEach(([k, v]) => {
+                if (k === "class") e.className = v;
+                else if (k === "on") Object.entries(v).forEach(([ev, fn]) => e.addEventListener(ev, fn));
+                else if (k === "style" && typeof v === "object") Object.assign(e.style, v);
+                else e[k] = v;
+            });
+            const append = (p, c) => {
+                if (Array.isArray(c)) c.forEach(n => append(p, n));
+                else if (c !== null && c !== undefined && c !== false) p.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+            };
+            children.forEach(c => append(e, c));
+            return e;
+        };
+
+        document.addEventListener("click", (e) => {
+            const tr = e.target.dataset.trs;
+            if (tr) transform(trs[tr]);
+            const gn = e.target.dataset.gens;
+            if (gn) generate(gens[gn]);
+        });
+
         window.onload = function () {
-            var valueTextArea = getValueElement();
+            const valueTextArea = getValueElement();
             valueTextArea.onmouseup =
             valueTextArea.onkeyup =
             valueTextArea.ontouchend =
@@ -442,6 +421,26 @@
             adjustRndStringSlider(document.getElementById("rndStringLength"));
 
             initHistory();
+
+            let lastValue = "";
+            function autoDetect() {
+                try {
+                    const currentValue = getValueElement().value;
+                    if (currentValue !== lastValue) {
+                        // if modified in the last 1 second return (debounce)
+                        if (new Date().getTime() - window.valueTouched.getTime() >= 1000) {
+                            lastValue = currentValue;
+                            const detected = detectFormatOrLanguage();
+                            updateDetectedFormatDisplay(detected);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Auto-detect error:", e);
+                } finally {
+                    window.setTimeout(autoDetect, 1000);
+                }
+            }
+            autoDetect();
         }
 
         function isAsync(func) {
@@ -576,19 +575,15 @@
         }
 
         function refreshHistoryItems(history) {
-            historyItems = document.getElementById("historyItems");
-            historyItems.innerHTML = "";
-            for(let i = history.length - 1; i >= 0; i--) {
-                let historyItem = document.createElement("div");
-                historyItem.setAttribute("class", "historyItem");
-                historyItem.setAttribute("ondblclick", "setFromHistory(" + i + ");");
-                //TODO add preview on mouse over
-                //TODO add set button
-                //TODO add insert button
-                //TODO add remove button
-                historyItem.innerText = history[i].v;
-                historyItems.appendChild(historyItem);
-            }
+            const container = document.getElementById("historyItems");
+            container.innerHTML = "";
+            history.slice().reverse().forEach((item, i) => {
+                container.appendChild(el("div", {
+                    class: "historyItem",
+                    ondblclick: () => setFromHistory(history.length - 1 - i),
+                    innerText: item.v
+                }));
+            });
         }
 
         function setFromHistory(index) {
@@ -650,7 +645,8 @@
             }
         }
 
-        var auxiliary = {
+        const auxiliary = {
+            isValidString: (str) => typeof str === 'string' && str.length > 0,
 
             uuidv4: function () {
                 try {
@@ -662,42 +658,7 @@
                         (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
                     );
                 }
-
-
             },
-
-            /*arrayBufferToBase64: function (buffer) {
-                var binary = '';
-                var bytes = new Uint8Array(buffer);
-                var len = bytes.byteLength;
-                for (var i = 0; i < len; i++) {
-                    binary += String.fromCharCode(bytes[i]);
-                }
-                return auxiliary.bytesToBase64(new TextEncoder().encode(binary));
-                //return auxiliary.utf8ToBase64(new TextEncoder().encode(binary));
-            },
-
-            base64ToArrayBuffer: function (base64) {
-                var binary_string = new TextDecoder().decode(auxiliary.base64ToBytes(base64));
-                //var binary_string = auxiliary.base64ToUtf8(base64);
-                
-                var len = binary_string.length;
-                var bytes = new Uint8Array(len);
-                for (var i = 0; i < len; i++)        {
-                    bytes[i] = binary_string.charCodeAt(i);
-                }
-                return bytes.buffer;
-            },
-
-            base64ToBytes: function (base64) {
-                const binString = atob(base64);
-                return Uint8Array.from(binString, (m) => m.codePointAt(0));
-            },
-
-            bytesToBase64: function (bytes) {
-                const binString = String.fromCodePoint(...bytes);
-                return btoa(binString);
-            },*/
 
             utf8ToBase64: function (str) {
                 const encoder = new TextEncoder();
@@ -713,8 +674,285 @@
                 }
                 const decoder = new TextDecoder();
                 return decoder.decode(uint8Array);
-            }
+            },
 
+            // detects if a string is valid JSON, malformed JSON, or not JSON at all.
+            // Returns:
+            //   - true: if the string is valid JSON.
+            //   - false: if the string is not trying to be JSON.
+            //   - object: with error details if the string is a malformed JSON.
+            isJson: function (str) {
+                if (!this.isValidString(str)) {
+                    return false;
+                }
+                // Peek first and last non-whitespace characters
+                const startMatch = str.match(/^\s*([{\["\d-]|true|false|null)/);
+                if (!startMatch) {
+                    return false;
+                }
+
+                try {
+                    const data = JSON.parse(str);
+                    return { valid: true, data: data };
+                } catch (e) {
+                    // Heuristic to determine if it's a malformed attempt vs. not JSON at all.
+                    const firstChar = startMatch[1][0];
+                    if (['{', '[', '"'].includes(firstChar) || /^(-|true|false|null)/i.test(startMatch[1]) || (firstChar >= '0' && firstChar <= '9')) {
+                        return { name: e.name, message: e.message, exception: e };
+                    }
+                    return false;
+                }
+            },
+
+            // detects if a string is valid XML, malformed XML, or not XML at all.
+            // Returns:
+            //   - true: if the string is well-formed XML.
+            //   - false: if the string is not trying to be XML.
+            //   - object: with error details if the string is a malformed XML.
+            isXml: function (str) {
+                if (!this.isValidString(str)) {
+                    return false;
+                }
+                const xmlLikeRegex = /^\s*<(\?|!|(\w)|(\/))/;
+                if (!xmlLikeRegex.test(str)) {
+                    return false;
+                }
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(str, "application/xml");
+                const parserError = xmlDoc.querySelector("parsererror");
+                if (parserError) {
+                    return {
+                        name: "XMLParserError",
+                        message: parserError.textContent || "Malformed XML",
+                        details: parserError
+                    };
+                }
+                return true;
+            },
+
+            // detects if a string is Base64 encoded, supporting multi-line input.
+            isBase64: function(str) {
+                if (!this.isValidString(str)) {
+                    return false;
+                }
+                // Quick check: does it contain non-base64 characters?
+                // This is much faster than replace on large strings.
+                if (/[^A-Za-z0-9+/=\s]/.test(str)) {
+                    return false;
+                }
+                const cleanStr = str.replace(/\s/g, '');
+                if (cleanStr.length === 0 || cleanStr.length % 4 !== 0) {
+                    return false;
+                }
+                const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+                return base64Regex.test(cleanStr);
+            },
+
+            // detects if a string is Hex encoded, supporting multi-line input.
+            isHex: function(str) {
+                if (!this.isValidString(str)) {
+                    return false;
+                }
+                // Quick check: does it contain non-hex characters?
+                if (/[^0-9a-fA-F\s]/.test(str)) {
+                    return false;
+                }
+                const cleanStr = str.replace(/\s/g, '');
+                if (cleanStr.length === 0 || cleanStr.length % 2 !== 0) {
+                    return false;
+                }
+                const hexRegex = /^[0-9a-fA-F]+$/;
+                return hexRegex.test(cleanStr);
+            },
+            
+            isYaml: function (str) {
+                if (!this.isValidString(str)) {
+                    return false;
+                }
+                // YAML is very broad; we only check a portion to avoid regex hanging on massive strings
+                const sample = str.substring(0, 10000);
+                const yamlIndicators = [
+                    /:\s*$/m,               // key:
+                    /^\s*-\s+/m,            // - item
+                    /^\s*\w+\s*:\s*.+$/m,   // key: value
+                    /^\s*#/,                // comment
+                    /^\s*---\s*$/m          // document start
+                ];
+                for (const regex of yamlIndicators) {
+                    if (regex.test(sample)) {
+                        return true;
+                    }
+                }
+                return false;
+            },
+
+            objectToYaml: function(obj, indentLevel, paddingChar) {
+                indentLevel = indentLevel || 0;
+                paddingChar = paddingChar || '  ';
+                const indent = paddingChar.repeat(indentLevel);
+                
+                if (obj === null) return 'null';
+                if (typeof obj === 'undefined') return '';
+                if (typeof obj !== 'object') {
+                    if (typeof obj === 'string') {
+                         if (obj.includes(':') || obj.includes('#') || obj.trim().length !== obj.length || !isNaN(Number(obj)) || obj === "true" || obj === "false" || obj === "null" || obj === "[]" || obj === "{}") {
+                             return JSON.stringify(obj);
+                         }
+                    }
+                    return String(obj);
+                }
+                
+                if (obj instanceof Date) return obj.toISOString();
+
+                let yaml = '';
+                
+                if (Array.isArray(obj)) {
+                    if (obj.length === 0) return '[]';
+                    obj.forEach(item => {
+                        const itemStr = auxiliary.objectToYaml(item, indentLevel + 1, paddingChar);
+                        if (itemStr.includes('\n') && (typeof item === 'object' && item !== null && !Array.isArray(item))) {
+                             const trimmedItem = itemStr.trimStart();
+                             yaml += `${indent}- ${trimmedItem}\n`;
+                        } else {
+                             if (itemStr.includes('\n')) {
+                                 yaml += `${indent}- \n${itemStr}\n`;
+                             } else {
+                                 yaml += `${indent}- ${itemStr.trim()}\n`;
+                             }
+                        }
+                    });
+                } else {
+                    if (Object.keys(obj).length === 0) return '{}';
+                    for (const [key, value] of Object.entries(obj)) {
+                        const valStr = auxiliary.objectToYaml(value, indentLevel + 1, paddingChar);
+                        
+                        const isComplex = typeof value === 'object' && value !== null && !(value instanceof Date);
+                        const isEmpty = isComplex && (Array.isArray(value) ? value.length === 0 : Object.keys(value).length === 0);
+                        
+                        if (isComplex && !isEmpty) {
+                            yaml += `${indent}${key}:\n${valStr}\n`;
+                        } else {
+                            yaml += `${indent}${key}: ${valStr.trim()}\n`;
+                        }
+                    }
+                }
+                return yaml.trimEnd();
+            },
+
+            yamlToObject: function(str) {
+                if (!str || !str.trim()) throw new Error("Empty string");
+
+                const linesArr = str.split(/\r?\n/);
+
+                const parseScalar = (v) => {
+                    v = v.trim();
+                    if (v === 'true') return true;
+                    if (v === 'false') return false;
+                    if (v === 'null') return null;
+                    if (v === '') return null;
+                    if (v === '[]') return [];
+                    if (v === '{}') return {};
+                    
+                    // Try to parse flow-style arrays/objects as JSON
+                    if ((v.startsWith('[') && v.endsWith(']')) || (v.startsWith('{') && v.endsWith('}'))) {
+                        try {
+                            return JSON.parse(v);
+                        } catch (e) {
+                            // If JSON parse fails (e.g. [a, b] without quotes), fall through to string/number
+                        }
+                    }
+
+                    const num = Number(v);
+                    if (!isNaN(num) && v.trim() !== "") return num;
+                    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) return v.slice(1, -1);
+                    return v;
+                };
+
+                function parseBlock(startIdx, minIndent) {
+                    let result = null;
+                    let i = startIdx;
+
+                    while (i < linesArr.length) {
+                        const line = linesArr[i];
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed.startsWith('#')) { i++; continue; }
+
+                        const indent = line.search(/\S/);
+                        if (indent < minIndent) break;
+
+                        if (trimmed.startsWith('-')) {
+                            if (result === null) result = [];
+                            if (!Array.isArray(result)) { i++; continue; }
+
+                            const content = trimmed.substring(1).trim();
+                            if (!content) {
+                                const sub = parseBlock(i + 1, indent + 1);
+                                result.push(sub.data);
+                                i = sub.nextIdx;
+                            } else {
+                                const kv = content.match(/^([^:]+):\s*(.*)$/);
+                                if (kv) {
+                                    let obj = {};
+                                    const k = kv[1].trim();
+                                    const v = kv[2].trim();
+                                    obj[k] = v ? parseScalar(v) : null;
+
+                                    const keyIndent = indent + 2;
+                                    i++;
+
+                                    while (i < linesArr.length) {
+                                        const nextLine = linesArr[i];
+                                        const nextTrimmed = nextLine.trim();
+                                        if (!nextTrimmed || nextTrimmed.startsWith('#')) { i++; continue; }
+
+                                        const nextIndent = nextLine.search(/\S/);
+                                        if (nextIndent < keyIndent) break;
+                                        if (nextTrimmed.startsWith('-')) break;
+
+                                        const nextKv = nextTrimmed.match(/^([^:]+):\s*(.*)$/);
+                                        if (nextKv) {
+                                            const nk = nextKv[1].trim();
+                                            const nv = nextKv[2].trim();
+                                            obj[nk] = nv ? parseScalar(nv) : null;
+                                            i++;
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                    result.push(obj);
+                                } else {
+                                    result.push(parseScalar(content));
+                                    i++;
+                                }
+                            }
+                        } else {
+                            if (result === null) result = {};
+                            if (Array.isArray(result)) { i++; continue; }
+
+                            const kv = trimmed.match(/^([^:]+):\s*(.*)$/);
+                            if (kv) {
+                                const key = kv[1].trim();
+                                const valStr = kv[2].trim();
+
+                                if (!valStr) {
+                                    const sub = parseBlock(i + 1, indent + 1);
+                                    result[key] = sub.data;
+                                    i = sub.nextIdx;
+                                } else {
+                                    result[key] = parseScalar(valStr);
+                                    i++;
+                                }
+                            } else {
+                                i++;
+                            }
+                        }
+                    }
+                    return { data: result, nextIdx: i };
+                }
+
+                const parsedResult = parseBlock(0, 0);
+                return parsedResult.data || {};
+            }
         };
 
         //Generators
@@ -793,148 +1031,40 @@
 
             //private functions
             function escapeHtmlChar(original, xmlSafe) {
-                let found = true;
-
-                let thechar = original.charCodeAt(0);
-
-                switch (thechar) {
-                    case 60: return "&lt;"; break; //<
-                    case 62: return "&gt;"; break; //>
-                    case 34: return "&quot;"; break; //"
-
-                    case 38: return "&amp;"; break; //&
-                    default: found = false; break;
-                }
+                const thechar = original.charCodeAt(0);
+                const basic = { 60: "&lt;", 62: "&gt;", 34: "&quot;", 38: "&amp;" };
+                if (basic[thechar]) return basic[thechar];
 
                 if (!xmlSafe) {
-                    switch (thechar) {
-                        case 198: return "&AElig;"; break;
-                        case 193: return "&Aacute;"; break;
-                        case 194: return "&Acirc;"; break;
-                        case 192: return "&Agrave;"; break;
-                        case 197: return "&Aring;"; break;
-                        case 195: return "&Atilde;"; break;
-                        case 196: return "&Auml;"; break;
-                        case 199: return "&Ccedil;"; break;
-                        case 208: return "&ETH;"; break;
-                        case 201: return "&Eacute;"; break;
-                        case 202: return "&Ecirc;"; break;
-                        case 200: return "&Egrave;"; break;
-                        case 203: return "&Euml;"; break;
-                        case 205: return "&Iacute;"; break;
-                        case 206: return "&Icirc;"; break;
-                        case 204: return "&Igrave;"; break;
-                        case 207: return "&Iuml;"; break;
-                        case 209: return "&Ntilde;"; break;
-                        case 211: return "&Oacute;"; break;
-                        case 212: return "&Ocirc;"; break;
-                        case 210: return "&Ograve;"; break;
-                        case 216: return "&Oslash;"; break;
-                        case 213: return "&Otilde;"; break;
-                        case 214: return "&Ouml;"; break;
-                        case 222: return "&THORN;"; break;
-                        case 218: return "&Uacute;"; break;
-                        case 219: return "&Ucirc;"; break;
-                        case 217: return "&Ugrave;"; break;
-                        case 220: return "&Uuml;"; break;
-                        case 221: return "&Yacute;"; break;
-                        case 225: return "&aacute;"; break;
-                        case 226: return "&acirc;"; break;
-                        case 230: return "&aelig;"; break;
-                        case 224: return "&agrave;"; break;
-                        case 229: return "&aring;"; break;
-                        case 227: return "&atilde;"; break;
-                        case 228: return "&auml;"; break;
-                        case 231: return "&ccedil;"; break;
-                        case 233: return "&eacute;"; break;
-                        case 234: return "&ecirc;"; break;
-                        case 232: return "&egrave;"; break;
-                        case 240: return "&eth;"; break;
-                        case 235: return "&euml;"; break;
-                        case 237: return "&iacute;"; break;
-                        case 238: return "&icirc;"; break;
-                        case 236: return "&igrave;"; break;
-                        case 239: return "&iuml;"; break;
-                        case 241: return "&ntilde;"; break;
-                        case 243: return "&oacute;"; break;
-                        case 244: return "&ocirc;"; break;
-                        case 242: return "&ograve;"; break;
-                        case 248: return "&oslash;"; break;
-                        case 245: return "&otilde;"; break;
-                        case 246: return "&ouml;"; break;
-                        case 223: return "&szlig;"; break;
-                        case 254: return "&thorn;"; break;
-                        case 250: return "&uacute;"; break;
-                        case 251: return "&ucirc;"; break;
-                        case 249: return "&ugrave;"; break;
-                        case 252: return "&uuml;"; break;
-                        case 253: return "&yacute;"; break;
-                        case 255: return "&yuml;"; break;
-                        case 162: return "&cent;"; break;
-                        default:
-                            found = false;
-                            break;
-                    }
+                    const entities = {
+                        198: "&AElig;", 193: "&Aacute;", 194: "&Acirc;", 192: "&Agrave;", 197: "&Aring;", 195: "&Atilde;", 196: "&Auml;", 199: "&Ccedil;",
+                        208: "&ETH;", 201: "&Eacute;", 202: "&Ecirc;", 200: "&Egrave;", 203: "&Euml;", 205: "&Iacute;", 206: "&Icirc;", 204: "&Igrave;",
+                        207: "&Iuml;", 209: "&Ntilde;", 211: "&Oacute;", 212: "&Ocirc;", 210: "&Ograve;", 216: "&Oslash;", 213: "&Otilde;", 214: "&Ouml;",
+                        222: "&THORN;", 218: "&Uacute;", 219: "&Ucirc;", 217: "&Ugrave;", 220: "&Uuml;", 221: "&Yacute;", 225: "&aacute;", 226: "&acirc;",
+                        230: "&aelig;", 224: "&agrave;", 229: "&aring;", 227: "&atilde;", 228: "&auml;", 231: "&ccedil;", 233: "&eacute;", 234: "&ecirc;",
+                        232: "&egrave;", 240: "&eth;", 235: "&euml;", 237: "&iacute;", 238: "&icirc;", 236: "&igrave;", 239: "&iuml;", 241: "&ntilde;",
+                        243: "&oacute;", 244: "&ocirc;", 242: "&ograve;", 248: "&oslash;", 245: "&otilde;", 246: "&ouml;", 223: "&szlig;", 254: "&thorn;",
+                        250: "&uacute;", 251: "&ucirc;", 249: "&ugrave;", 252: "&uuml;", 253: "&yacute;", 255: "&yuml;", 162: "&cent;"
+                    };
+                    if (entities[thechar]) return entities[thechar];
                 }
 
-                if (!found) {
-                    const hex = new Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
-                    if (thechar > 127) {
-                        const c = thechar;
-                        const a4 = c % 16;
-                        c = Math.floor(c / 16);
-                        const a3 = c % 16;
-                        c = Math.floor(c / 16);
-                        const a2 = c % 16;
-                        c = Math.floor(c / 16);
-                        const a1 = c % 16;
-                        return "&#x" + hex[a1] + hex[a2] + hex[a3] + hex[a4] + ";";
-                    }
-                    else {
-                        return original;
-                    }
+                if (thechar > 127) {
+                    return "&#x" + thechar.toString(16).padStart(4, "0") + ";";
                 }
+                return original;
             }
 
             function encodeChar(original, skipNewLine) {
                 if (skipNewLine && original == '\n') return;
-                let found = true;
-                const thecharchar = original.charAt(0);
+                const escapes = { '\n': "\\n", '\r': "\\r", '\'': "\\'", '"': "\\\"", '\\': "\\\\", '\t': "\\t", '\b': "\\b", '\f': "\\f" };
+                if (escapes[original]) return escapes[original];
+
                 const thechar = original.charCodeAt(0);
-                switch (thecharchar) {
-                    case '\n': return "\\n"; break; //newline
-                    case '\r': return "\\r"; break; //Carriage return
-                    case '\'': return "\\'"; break;
-                    case '"': return "\\\""; break;
-                    case '\\': return "\\\\"; break;
-                    case '\t': return "\\t"; break;
-                    case '\b': return "\\b"; break;
-                    case '\f': return "\\f"; break;
-
-                    default:
-                        found = false;
-                        break;
+                if (thechar > 127) {
+                    return "\\u" + thechar.toString(16).padStart(4, "0");
                 }
-                if (!found) {
-                    const hex = new Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
-
-                    if (thechar > 127) {
-                        const c = thechar;
-                        const a4 = c % 16;
-                        c = Math.floor(c / 16);
-                        const a3 = c % 16;
-                        c = Math.floor(c / 16);
-                        const a2 = c % 16;
-                        c = Math.floor(c / 16);
-                        const a1 = c % 16;
-                        return "\\u" + hex[a1] + hex[a2] + hex[a3] + hex[a4] + "";
-                    }
-                    else {
-                        return original;
-                    }
-                }
-
-
+                return original;
             }
 
             function xslTransform(source, xslTransformer) {
@@ -1214,6 +1344,8 @@
                             return JSON.stringify(JSON.parse(value), null, padding);
                         case "XML":
                             return formatXml(value, true, padding);
+                        case "YAML":
+                            return auxiliary.objectToYaml(auxiliary.yamlToObject(value), 0, padding);
                         default:
                             console.error("Unsupported formatting lang");
                             return -1;
@@ -1227,58 +1359,37 @@
                             return JSON.stringify(JSON.parse(value));
                         case "XML":
                             return formatXml(value, false);
+                        case "YAML":
+                            // YAML minification isn't standard like JSON/XML.
+                            // We return a "clean" block-style version (normalized, no comments).
+                            return auxiliary.objectToYaml(auxiliary.yamlToObject(value), 0, "  ");
                         default:
                             console.error("Unsupported formatting lang");
                             return -1;
                     }
                 },
 
-                toUpperCase: function (value) {
-                    return value.toUpperCase();
-                },
+                toUpperCase: (v) => v.toUpperCase(),
+                toLowerCase: (v) => v.toLowerCase(),
+                replicate: (v, p) => {
+                    const mode = p ? p.getReplicateMode() : "simple";
+                    if (mode === "simple") return v + v;
 
-                toLowerCase: function (value) {
-                    return value.toLowerCase();
-                },
-
-                replicate: function (value) {
-                    return value + value;
-                },
-
-                replicate: function (value, params) {
-
-                    const mode = params.getReplicateMode()
-
-                    if(mode === "simple") {
-                        return value + value;
-                    }
-                    
-                    const template = value;
-                    
-                    const placeholder = params.getReplicatePlaceholder();
-
+                    const template = v;
+                    const placeholder = p.getReplicatePlaceholder();
                     let result = "";
+
                     if (mode === "range") {
-                        let start = params.getReplicateRangeStart();
-                        let end = params.getReplicateRangeEnd();
-                        
-                        if(start > end) {
-                            for(let i = start; i >= end; i--) {
-                                result += template.replaceAll(placeholder, i);
-                            }
-                        } else {
-                            for(let i = start; i <= end; i++) {
-                                result += template.replaceAll(placeholder, i);
-                            }
+                        const start = p.getReplicateRangeStart(), end = p.getReplicateRangeEnd();
+                        const step = start > end ? -1 : 1;
+                        for (let i = start; step > 0 ? i <= end : i >= end; i += step) {
+                            result += template.replaceAll(placeholder, i);
                         }
-                        
                     } else {
-                        const items = params.getReplicateTemplateItems();
-                        for(let i = 0; i < items.length; i++) {
-                            result += template.replaceAll(placeholder, items[i]);
-                        }
+                        p.getReplicateTemplateItems().forEach(item => {
+                            result += template.replaceAll(placeholder, item);
+                        });
                     }
-                    
                     return result;
                 },
 
@@ -1321,11 +1432,11 @@
                     return xmlToJsonAux(value);
                 },
 
-                replace: function(value, params) {
-                    const replaceValue = params.replaceValue();
-                    const replaceWith = params.replaceWith();
-                    const replaceAll = params.all();
-                    const caseSensitive = params.caseSensitive();
+                replace: function(value) {
+                    const replaceValue = getReplaceValue();
+                    const replaceWith = getReplaceWith();
+                    const replaceAll = getReplaceAll();
+                    const caseSensitive = getReplaceCaseSensitive();
 
                     if(replaceValue == "") {
                         warn("Nothing to replace");
@@ -1334,7 +1445,7 @@
 
                     let result = value;
 
-                    if(params.isRegex()) {
+                    if(isReplaceRegex()) {
                         let regex = null;
                         try {
                             regex = new RegExp(replaceValue, "m" + (caseSensitive == true? "": "i") + (replaceAll == true? "g": ""));
@@ -1458,6 +1569,12 @@
             valueTextArea.focus();
         }
 
+        function copyValue() {
+            const valueTextArea = getValueElement();
+            copyToClipboard(valueTextArea.value);
+            info("Value copied to clipboard!");
+        }
+
         function cropToSelection() {
             const valueTextArea = getValueElement();
             valueTextArea.value = valueTextArea.value.substr(cursorPos.start, cursorPos.end - cursorPos.start);
@@ -1477,7 +1594,7 @@
             a.click();
         }
 
-        var cursorPos = {
+        let cursorPos = {
             start: -1,
             end: -1,
             line: -1,
@@ -1486,10 +1603,23 @@
         
         function getCursorPos(input) {
             if ("selectionStart" in input && document.activeElement == input) {
-                cursorPos.start = input.selectionStart;
+                const text = input.value;
+                const start = input.selectionStart;
+                cursorPos.start = start;
                 cursorPos.end = input.selectionEnd;
-                cursorPos.line = input.value.substr(0, input.selectionStart).split(/\r?\n|\r/).length;
-                cursorPos.column = getCol(input, input.selectionStart);
+                
+                let line = 1;
+                let lastNewLine = text.lastIndexOf('\n', start - 1);
+                const column = start - lastNewLine - 1;
+
+                let pos = lastNewLine;
+                while (pos !== -1) {
+                    line++;
+                    pos = text.lastIndexOf('\n', pos - 1);
+                }
+
+                cursorPos.line = line;
+                cursorPos.column = column;
                 return cursorPos;
             }
             else if (input.createTextRange) {
@@ -1510,8 +1640,17 @@
                         pos.end++;
                     }
 
-                    pos.line = input.value.substr(0, input.selectionStart).split(/\r?\n|\r/).length;
-                    pos.column = getCol(input, input.selectionStart);
+                    const text = input.value;
+                    let line = 1;
+                    let lastNewLine = -1;
+                    for (let i = 0; i < pos.start; i++) {
+                        if (text[i] === '\n') {
+                            line++;
+                            lastNewLine = i;
+                        }
+                    }
+                    pos.line = line;
+                    pos.column = pos.start - lastNewLine - 1;
                     cursorPos = pos;
                     return cursorPos;
                 }
@@ -1525,68 +1664,40 @@
             return cursorPos;
         }
 
+        const getVal = (id, prop = 'value') => document.getElementById(id)[prop];
+
         function formatWhitepacePadding() {
-            return (document.getElementById("useTabs").checked == true) ? '\t' : '  ';
+            return getVal("useTabs", "checked") ? '\t' : '  ';
         }
 
-        function getFormattingLang() {
-            return document.getElementById("formattingLang").value;
-        }
-
-        function xmlSafe() {
-            return document.getElementById("xmlSafe").checked;
-        }
-
-        function sortIsAscending() {
-            return !document.getElementById("sortDescending").checked;
-        }
-
-        function isReplaceRegex() {
-            return document.getElementById("replaceRegex").checked;
-        }
-
-        function getReplaceValue() {
-            return document.getElementById("replaceValue").value;
-        }
+        function getFormattingLang() { return getVal("formattingLang"); }
+        function xmlSafe() { return getVal("xmlSafe", "checked"); }
+        function sortIsAscending() { return !getVal("sortDescending", "checked"); }
+        function isReplaceRegex() { return getVal("replaceRegex", "checked"); }
+        function getReplaceValue() { return getVal("replaceValue"); }
 
         function getReplaceWith() {
-            let replaceWith = document.getElementById("replaceWith").value;
-            return getReplaceEscaped()? trs.CLikeLang_StringUnescape(replaceWith) : replaceWith;
+            let val = getVal("replaceWith");
+            return getVal("replaceEscaped", "checked") ? trs.CLikeLang_StringUnescape(val) : val;
         }
 
-        function getCompressAlgorithm() {
-            return document.getElementById("compressAlgorithm").value;
-        }
-
-        function getDigestAlgorithm() {
-            return document.getElementById("digestAlgorithm").value;
-        }
-        
-        function getDigestOutputFormat() {
-            return document.getElementById("digestOutputFormat").value;
-        }
-
-        function getReplaceAll() {
-            return document.getElementById("replaceAll").checked;
-        }
-
-        function getReplaceCaseSensitive() {
-            return document.getElementById("replaceCaseSensitive").checked;
-        }
-        
-        function getReplaceEscaped() {
-            return document.getElementById("replaceEscaped").checked;
-        }
+        function getCompressAlgorithm() { return getVal("compressAlgorithm"); }
+        function getDigestAlgorithm() { return getVal("digestAlgorithm"); }
+        function getDigestOutputFormat() { return getVal("digestOutputFormat"); }
+        function getReplaceAll() { return getVal("replaceAll", "checked"); }
+        function getReplaceCaseSensitive() { return getVal("replaceCaseSensitive", "checked"); }
+        function getReplaceEscaped() { return getVal("replaceEscaped", "checked"); }
 
         function getCol(value, start) {
+            const text = value.value;
             let index = start;
-            let char = '\n';
-            do {
-                char = value.value[-1 + index--];
-            } while (char != '\n' && char != '\r' && index >= 0);
-            return start - index - 1;
+            while (index > 0 && text[index - 1] !== '\n' && text[index - 1] !== '\r') {
+                index--;
+            }
+            return start - index;
         }
 
+        window.valueTouched = new Date();
         function fetchData() {
             if(document.activeElement == getValueElement()) {
                 const valueTextArea = getValueElement();
@@ -1594,11 +1705,61 @@
 
                 document.getElementById("start").innerHTML = pos.start;
                 document.getElementById("end").innerHTML = pos.end;
+                document.getElementById("selection").innerHTML = pos.end - pos.start;
                 document.getElementById("length").innerHTML = valueTextArea.value.length;
 
                 document.getElementById("line").innerHTML = pos.line;
                 document.getElementById("col").innerHTML = pos.column;
+
+                window.valueTouched = new Date();
             }
+        }
+
+        function detectFormatOrLanguage() {
+            const valueTextArea = getValueElement();
+            const value = valueTextArea.value;
+
+            // Check for JSON (three-state return)
+            const jsonCheckResult = auxiliary.isJson(value);
+            if (jsonCheckResult.valid === true) {
+                return { type: "JSON", valid: true, data: jsonCheckResult.data };
+            } else if (typeof jsonCheckResult === 'object') {
+                console.error("Malformed JSON detected: " + jsonCheckResult.message);
+                return { type: "JSON", valid: false, error: jsonCheckResult };
+            }
+
+            // Check for XML (three-state return)
+            const xmlCheckResult = auxiliary.isXml(value);
+            if (xmlCheckResult === true) {
+                return { type: "XML", valid: true };
+            } else if (typeof xmlCheckResult === 'object') {
+                console.error("Malformed XML detected: " + xmlCheckResult.message);
+                return { type: "XML", valid: false, error: xmlCheckResult };
+            }
+
+            // Check for YAML (three-state return)
+            if (auxiliary.isYaml(value) === true) {
+                try {
+                    const data = auxiliary.yamlToObject(value);
+                    return { type: "YAML", valid: true, data: data };
+                } catch (e) {
+                    console.error("Malformed YAML detected: " + e.message);
+                    return { type: "YAML", valid: false, error: e };
+                }
+            }
+            
+            // Check for Base64 (boolean return)
+            if (auxiliary.isBase64(value) === true) {
+                return { type: "Base64", valid: true };
+            }
+            
+            // Check for Hex (boolean return)
+            if (auxiliary.isHex(value) === true) {
+                return { type: "Hex", valid: true };
+            }
+
+            // Format not detected
+            return null;
         }
 
         function rndSpecialChanged(event) {
@@ -1609,7 +1770,7 @@
             }
         }
 
-        var stopRndChangeEvent = false;
+        let stopRndChangeEvent = false;
 
         function preventInvalidSpecialChars(event) {
             if (event.keyCode < 32) {
@@ -1641,48 +1802,28 @@
             };
         }
 
-        var messageId = null;
-        function info(text, delay) {
-            document.getElementById("messageType").innerHTML = "&#8505;&nbsp;Info";
+        let messageId = null;
+        function notify(text, type, delay) {
+            const configs = {
+                info:  { label: "&#8505;&nbsp;Info", bg: "aliceblue",      fg: "#7070A0" },
+                warn:  { label: "&#9888;&nbsp;Warning", bg: "blanchedalmond", bg: "blanchedalmond", fg: "#806640" },
+                error: { label: "&#9888;&nbsp;Error", bg: "coral",           fg: "#905050" }
+            };
+            const config = configs[type] || configs.info;
+            const msg = document.getElementById("message");
+            document.getElementById("messageType").innerHTML = config.label;
             document.getElementById("messageText").innerText = text;
-
-            document.getElementById("message").style.background = "aliceblue";
-            document.getElementById("message").style.color = "#7070A0";
-
-            document.getElementById("message").style.display = "flex";
-
+            msg.style.background = config.bg;
+            msg.style.color = config.fg;
+            msg.style.display = "flex";
             const id = auxiliary.uuidv4();
             messageId = id;
-            window.setTimeout(function () { if (id != messageId) { return; } document.getElementById("message").style.display = "none"; }, typeof delay == "number" ? delay : 2000);
+            window.setTimeout(() => { if (id == messageId) msg.style.display = "none"; }, delay || 2000);
         }
 
-        function warn(text, delay) {
-            document.getElementById("messageType").innerHTML = "&#9888;&nbsp;Warning";
-            document.getElementById("messageText").innerText = text;
-
-            document.getElementById("message").style.background = "blanchedalmond";
-            document.getElementById("message").style.color = "#806640";
-
-            document.getElementById("message").style.display = "flex";
-
-            const id = auxiliary.uuidv4();
-            messageId = id;
-            window.setTimeout(function () { if (id != messageId) { return; } document.getElementById("message").style.display = "none"; }, typeof delay == "number" ? delay : 2000);
-        }
-
-        function error(text, delay) {
-            document.getElementById("messageType").innerHTML = "&#9888;&nbsp;Error";
-            document.getElementById("messageText").innerText = text;
-
-            document.getElementById("message").style.background = "coral";
-            document.getElementById("message").style.color = "#905050";
-
-            document.getElementById("message").style.display = "flex";
-
-            const id = auxiliary.uuidv4();
-            messageId = id;
-            window.setTimeout(function () { if (id != messageId) { return; } document.getElementById("message").style.display = "none"; }, typeof delay == "number" ? delay : 2000);
-        }
+        const info = (t, d) => notify(t, "info", d);
+        const warn = (t, d) => notify(t, "warn", d);
+        const error = (t, d) => notify(t, "error", d);
 
         function setWrap() {
             const valueElement = getValueElement();
@@ -1785,75 +1926,425 @@
             }
         }
 
+        function updateDetectedFormatDisplay(detected) {
+            const detectedFormatDiv = document.getElementById("detectedFormatDiv");
+            const formatIdentifier = document.getElementById("formatIdentifier");
+            const formatValidity = document.getElementById("formatValidity");
+            const objectTreeContainer = document.getElementById("objectTree");
+            const formattingLangSelect = document.getElementById("formattingLang");
+
+            if(detected == null) {
+                detectedFormatDiv.style.display = "none";
+                formatIdentifier.innerText = "";
+                formatValidity.innerText = "";
+                formattingLangSelect.value = "JSON";
+
+                if(objectTreeContainer) {
+                    objectTreeContainer.style.display = 'none';
+                    objectTreeContainer.innerHTML = '';
+                }
+                return;
+            }
+
+            detectedFormatDiv.style.display = "block";
+            formatIdentifier.innerText = detected.type;
+
+            if(detected.valid === false) {
+                formatIdentifier.classList.add("error-tag");
+                formatIdentifier.classList.remove("success-tag");
+                formatValidity.innerText = detected.error.message;
+                formattingLangSelect.value = "JSON";
+
+                if(objectTreeContainer) {
+                    objectTreeContainer.style.display = 'none';
+                    objectTreeContainer.innerHTML = '';
+                }
+            } else {
+                formatIdentifier.classList.remove("error-tag");
+                formatIdentifier.classList.add("success-tag");
+                formatValidity.innerText = "";
+
+                if (["JSON", "XML", "YAML"].includes(detected.type)) {
+                    formattingLangSelect.value = detected.type;
+                } else {
+                    formattingLangSelect.value = "JSON";
+                }
+
+                if ((detected.type === "JSON" || detected.type === "YAML") && objectTreeContainer) {
+                    objectTreeContainer.style.display = 'block';
+                    createObjectTreeView(detected.data, "objectTree", detected.type);
+
+                    if (detected.type === "YAML") {
+                        const rawValue = getValueElement().value;
+                        if (/(?:^|\s)[&*][a-zA-Z0-9_-]+/m.test(rawValue)) {
+                            formatValidity.innerText = "Note: YAML anchors/aliases (&/*) detected but not supported (treated as strings).";
+                        }
+                    }
+                } else {
+                    if(objectTreeContainer) {
+                        objectTreeContainer.style.display = 'none';
+                        objectTreeContainer.innerHTML = '';
+                    }
+                }
+            }
+        }
+
+        function applyValueToMain(value) {
+            getValueElement().value = value;
+            flashValue();
+            fetchData();
+            updateDetectedFormatDisplay(detectFormatOrLanguage());
+        }
+
+        /**
+         * Renders a JavaScript object into a collapsible and expandable tree view.
+         * @param {object} data The JavaScript object to render.
+         * @param {string} containerElementId The ID of the container element to render the tree into.
+         * @param {string} type The type of the object (e.g., "JSON").
+         */
+        function createObjectTreeView(data, containerElementId, type = "JSON") {
+            const container = document.getElementById(containerElementId);
+            if (!container) return;
+            container.innerHTML = '';
+            container.classList.add('object-tree-container');
+
+            const copyToCb = (text, button) => {
+                navigator.clipboard.writeText(text).then(() => {
+                    const old = button.textContent;
+                    button.textContent = 'Copied!';
+                    setTimeout(() => button.textContent = old, 1500);
+                });
+            };
+
+            const buildNode = (key, value, isRoot = false) => {
+                const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+                const styleType = type === 'boolean' ? (value ? 'boolean-true' : 'boolean-false') : type;
+                const isComplex = type === 'object' || type === 'array';
+                const isEmpty = isComplex && (Array.isArray(value) ? !value.length : !Object.keys(value).length);
+                const isExpandable = isComplex && !isEmpty;
+
+                const toggle = el('span', { class: 'toggle' + (isExpandable ? '' : ' hidden-visibility'), textContent: isExpandable ? '▶' : '▼' });
+                const btn = (text, title, onclick) => el('button', { class: 'button button-xsmall node-action-btn', textContent: text, title, on: { click: (e) => { e.stopPropagation(); onclick(e); } } });
+
+                const childrenContainer = el('div', { class: 'children hidden-display' });
+                let childrenBuilt = false;
+
+                const row = el('div', { class: isExpandable ? 'header' : 'primitive-node', on: { click: () => {
+                    if (!isExpandable) return;
+                    const isExpanded = toggle.classList.toggle('expanded');
+                    toggle.textContent = isExpanded ? '▼' : '▶';
+                    childrenContainer.classList.toggle('hidden-display', !isExpanded);
+                    if (isExpanded && !childrenBuilt) {
+                        const entries = Array.isArray(value) ? Array.from(value.entries()) : Object.entries(value);
+                        const CHUNK = 100;
+                        let cur = 0;
+                        const render = () => {
+                            entries.slice(cur, cur + CHUNK).forEach(([k, v]) => childrenContainer.appendChild(buildNode(k, v)));
+                            cur += CHUNK;
+                            if (cur < entries.length) {
+                                childrenContainer.appendChild(el('div', { class: 'node header load-more', textContent: `... Show more (${entries.length - cur} left)`, on: { click: (e) => { e.stopPropagation(); childrenContainer.lastChild.remove(); render(); } } }));
+                            }
+                        };
+                        render();
+                        childrenBuilt = true;
+                    }
+                }}}, 
+                    toggle,
+                    el('span', { class: `type-icon ${styleType}`, textContent: {object:'{}', array:'[]', string:'“”', number:'#', boolean:value?'✓':'✗', null:'∅'}[type] || '' }),
+                    el('span', { class: `key ${styleType}`, textContent: `${key}: ` }),
+                    isComplex ? el('span', { class: 'preview', textContent: Array.isArray(value) ? `Array(${value.length})` : 'Object' }) : (() => {
+                        const full = JSON.stringify(value), max = 1000, isLong = full.length > max;
+                        const txt = el('span', { textContent: isLong ? full.slice(0, max) : full });
+                        const ell = el('span', { class: 'ellipsis' + (isLong ? '' : ' hidden-display'), textContent: '...' });
+                        const more = isLong ? el('span', { class: 'expand-btn', textContent: ' (Show more)', on: { click: (e) => {
+                            e.stopPropagation();
+                            const show = more.textContent === ' (Show more)';
+                            txt.textContent = show ? full : full.slice(0, max);
+                            ell.classList.toggle('hidden-display', show);
+                            more.textContent = show ? ' (Show less)' : ' (Show more)';
+                        }}}) : null;
+                        return el('span', { class: `value ${styleType}` }, txt, ell, more);
+                    })(),
+                    el('div', { class: 'node-buttons' },
+                        isComplex ? [
+                            btn('Copy JSON', '', (e) => copyToCb(JSON.stringify(value, null, formatWhitepacePadding()), e.target)),
+                            btn('Copy YAML', '', (e) => copyToCb(auxiliary.objectToYaml(value, 0, formatWhitepacePadding()), e.target)),
+                            btn('Apply JSON', 'Replace main text', () => applyValueToMain(JSON.stringify(value, null, formatWhitepacePadding()))),
+                            btn('Apply YAML', 'Replace main text', () => applyValueToMain(auxiliary.objectToYaml(value, 0, formatWhitepacePadding())))
+                        ] : [
+                            btn('Copy Value', '', (e) => copyToCb(typeof value === 'string' ? value : JSON.stringify(value), e.target)),
+                            btn('Apply Value', 'Replace main text', () => applyValueToMain(typeof value === 'string' ? value : JSON.stringify(value)))
+                        ]
+                    )
+                );
+
+                return el('div', { class: 'node' + (isRoot ? ' root' : '') }, row, childrenContainer);
+            };
+
+            container.appendChild(el('div', { class: 'object-tree-title' },
+                el('span', { textContent: 'Tree Viewer' }),
+                el('span', { class: 'type-tag', textContent: type }),
+                el('div', { class: 'tree-actions' },
+                    el('button', { class: 'tree-action-btn', textContent: 'Expand All', on: { click: () => {
+                        const exp = (p) => {
+                            p.querySelectorAll('.header').forEach(h => {
+                                if (!h.querySelector('.toggle').classList.contains('expanded')) h.click();
+                                const children = h.closest('.node').querySelector('.children');
+                                if (children) exp(children);
+                            });
+                        };
+                        exp(container);
+                    }}}),
+                    el('button', { class: 'tree-action-btn', textContent: 'Collapse All', on: { click: () => {
+                        Array.from(container.querySelectorAll('.header')).reverse().forEach(h => {
+                            if (h.querySelector('.toggle').classList.contains('expanded')) h.click();
+                        });
+                    }}})
+                )
+            ));
+            container.appendChild(buildNode('root', data, true));
+        }
+
     </script>
+    <!-- Object Tree View Styles -->
+    <style>
+        .object-tree-container {
+            font-family: Menlo, Monaco, 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            background-color: #242424;
+            color: silver;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            margin-top: 10px;
+        }
+        .node {
+            margin-left: 2em;
+            padding-left: 5px;
+            border-left: 1px dotted #555;
+        }
+        .node.root {
+            margin-left: 0;
+            padding-left: 0;
+            border-left: none;
+        }
+        .header, .primitive-node {
+            display: flex;
+            align-items: center;
+            padding: 2px 4px;
+            transition: background-color 0.1s ease;
+            border-radius: 2px;
+            min-width: 0; /* Allow flex children to shrink */
+        }
+        .header:hover, .primitive-node:hover {
+            background-color: #3e3e3e;
+        }
+        .header {
+            cursor: pointer;
+        }
+        .toggle {
+            width: 1.5em;
+            text-align: center;
+            font-size: 0.8em;
+            color: #aaa;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .toggle.hidden-visibility {
+            visibility: hidden;
+        }
+        .type-icon {
+            width: 1.8em;
+            text-align: center;
+            margin-right: 8px;
+            font-weight: bold;
+            font-size: 0.8em;
+            flex-shrink: 0;
+            user-select: none;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+            line-height: 1.6;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .key {
+            font-weight: bold;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+        .value {
+            margin-left: 0.5em;
+            overflow-wrap: anywhere;
+            word-break: break-all;
+            min-width: 0;
+            flex-grow: 1;
+        }
+        /* Type-specific colors */
+        .object { color: #d2a8ff; }
+        .array { color: #ffa657; }
+        .string { color: #a5d6ff; }
+        .number { color: #79c0ff; }
+        .boolean-true { color: #56d364; }
+        .boolean-false { color: #ff7b72; }
+        .null { color: #6e7681; }
+
+        .preview {
+            margin-left: 0.5em;
+            color: #8b949e;
+            font-style: italic;
+            flex-shrink: 0;
+        }
+        .children {
+            display: block;
+        }
+        .children.hidden-display {
+            display: none;
+        }
+        .node-buttons {
+            display: flex;
+            gap: 5px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .node-action-btn {
+            width: auto;
+            visibility: hidden;
+            white-space: nowrap;
+        }
+        .header:hover .node-action-btn, .primitive-node:hover .node-action-btn {
+            visibility: visible;
+        }
+
+        .object-tree-title {
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #808080;
+            font-family: sans-serif;
+            font-size: 0.9rem;
+            position: sticky;
+            top: 0;
+            background-color: #242424;
+            z-index: 10;
+            padding-top: 5px;
+        }
+
+        .type-tag {
+            background-color: #444;
+            color: #ccc;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            margin-left: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tree-actions {
+            margin-left: auto;
+            display: flex;
+            gap: 10px;
+        }
+
+        .tree-action-btn {
+            background: none;
+            border: 1px solid #444;
+            color: #808080;
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .tree-action-btn:hover {
+            background-color: #444;
+            color: #ccc;
+            border-color: #555;
+        }
+
+        .ellipsis {
+            color: orange;
+            font-weight: bold;
+            user-select: none;
+        }
+
+        .expand-btn {
+            cursor: pointer;
+            color: #d2a8ff;
+            font-size: 0.9em;
+            margin-left: 5px;
+            user-select: none;
+        }
+
+        .load-more {
+            color: #d2a8ff;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .hidden-display {
+            display: none !important;
+        }
+    </style>
 </head>
 
 <body>
-    <textarea id="value" value="" placeholder="Text goes here..." autofocus ondrop="dropHandler(event);"></textarea>
-    <div style="float: right;position: relative;font-size: small; margin-top: 0.2rem">Line: <span id="line"></span><span
-            style="margin-left: 10px;">Column: </span><span id="col"></span></div>
-    <div style="float: right;clear: right;position: relative;font-size: small;">Start: <span id="start"></span><span
-            style="margin-left: 10px;">End: </span><span id="end"></span><span style="margin-left: 10px;">Length:
-        </span><span id="length"></span></div>
+    <textarea id="value" value="" placeholder="Text goes here..." autofocus ondrop="dropHandler(event);" spellcheck="false"></textarea>
+    <div style="float: right; position: relative; font-size: small; margin-top: 0.2rem; display: grid; grid-template-columns: 1fr 1fr; column-gap: 0.5rem; row-gap: 0.1rem; text-align: end;" >
+        <div>Line: <span id="line"></span></div><div>Column: </span><span id="col"></span></div>
+        <div>Start: <span id="start"></span></div><div>End: <span id="end"></span></div>
+        <div>Selection: <span id="selection"></span></div><div>Length: <span id="length"></span></div>
+    </div>
+    <div style="float: right; clear: right; position: relative; font-size: small; padding-top: 0.3rem; text-align: end; display: none" id="detectedFormatDiv">
+        <span id="formatIdentifier" class="error-tag" style="display: block; float: right;"></span>
+        <span id="formatValidity" style="color: orange; padding-top: 0.2rem; display: block; clear: right; max-width: 25rem;"></span>
+    </div>
+
     <div>
-        <!--TODO review/improve url and html encoders-->
         <div class="buttonGroup">
-            <input type="button" class="button button-xsmall" value="URL Encode"
-                onclick="transform(trs.urlencode);" /><br />
-            <input type="button" class="button button-xsmall" value="URL Decode" onclick="transform(trs.urldecode);" />
+            <input type="button" value="URL Encode" data-trs="urlencode" /><br />
+            <input type="button" value="URL Decode" data-trs="urldecode" />
             <hr/>
-            <input type="button" class="button button-xsmall" value="HTML Encode"
-                onclick="transform(trs.htmlencode2, {'xmlSafe': xmlSafe});" />
+            <input type="button" value="HTML Encode" onclick="transform(trs.htmlencode2, {'xmlSafe': xmlSafe});" />
             <br />
             <label class="off-on">
                 <input id="xmlSafe" type="checkbox" checked />
                 <span class="off-on-slider round"></span>
             </label><label for="xmlSafe">XML safe?</label>
             <br />
-            <input type="button" class="button button-xsmall" value="HTML Decode"
-                onclick="transform(trs.htmldecode);" />
+            <input type="button" value="HTML Decode" data-trs="htmldecode" />
         </div>
 
         <div class="buttonGroup">
-            <input type="button" class="button button-xsmall" value="Base64 Encode"
-                onclick="transform(trs.base64encode);" /><br />
-            <input type="button" class="button button-xsmall" value="Base64 Decode"
-                onclick="transform(trs.base64decode);" />
+            <input type="button" value="Base64 Encode" data-trs="base64encode" /><br />
+            <input type="button" value="Base64 Decode" data-trs="base64decode" />
             <hr/>
-            <input type="button" class="button button-xsmall" value="HEX Encode"
-                onclick="transform(trs.hexencode);" /><br />
-            <input type="button" class="button button-xsmall" value="HEX Decode"
-                onclick="transform(trs.hexdecode);" />
+            <input type="button" value="HEX Encode" data-trs="hexencode" /><br />
+            <input type="button" value="HEX Decode" data-trs="hexdecode" />
         </div>
 
         <div class="buttonGroup">
-            <input type="button" class="button button-xsmall" value="String Escape"
-                onclick="transform(trs.CLikeLang_StringEscape);" /><br />
-            <input type="button" class="button button-xsmall" value="String Unescape"
-                onclick="transform(trs.CLikeLang_StringUnescape);" />
+            <input type="button" value="String Escape" data-trs="CLikeLang_StringEscape" /><br />
+            <input type="button" value="String Unescape" data-trs="CLikeLang_StringUnescape" />
             <hr/>
-            <input type="button" class="button button-xsmall" value="Stringify"
-                onclick="transform(trs.CTypeLang_Stringify);" /><br />
-            <input type="button" class="button button-xsmall" value="Unstringify"
-                onclick="transform(trs.CTypeLang_Unstringify);" />
+            <input type="button" value="Stringify" data-trs="CTypeLang_Stringify" /><br />
+            <input type="button" value="Unstringify" data-trs="CTypeLang_Unstringify" />
         </div>
 
         <div class="buttonGroup">
-            <input type="button" class="button button-xsmall" value="Pretty Print"
+            <input type="button" value="Pretty Print"
                 onclick="transform(trs.prettyPrint, { 'getPadding': formatWhitepacePadding, 'getFormatingLang': getFormattingLang });"><br />
-            <input type="button" class="button button-xsmall" value="Minify"
+            <input type="button" value="Minify"
                 onclick="transform(trs.minify, { 'getFormatingLang': getFormattingLang });"><br/>
                 <hr/>
-            <select id="formattingLang" class="button button-xsmall" style="text-align: left;">
-                <option selected value="JSON">
-                    JSON
-                </option>
-                <option value="XML">
-                    XML
-                </option>
-                <option value="YAML" disabled>
-                    YAML
-                </option>
+            <select id="formattingLang">
+                <option selected value="JSON">JSON</option>
+                <option value="XML">XML</option>
+                <option value="YAML">YAML</option>
             </select><br/>
             <label class="switch">
                 <input type="checkbox" id="useTabs">
@@ -1862,56 +2353,46 @@
         </div>
         
         <div class="buttonGroup">
-            <input type="button" class="button button-xsmall" value="Digest"
+            <input type="button" value="Digest"
                 onclick="transform(trs.digest, {'digestAlgorithm': getDigestAlgorithm, 'digestOutputFormat': getDigestOutputFormat });" /><br />
            
             <hr/>
-            <select id="digestAlgorithm" class="button button-xsmall" style="text-align: left;">
+            <select id="digestAlgorithm">
                 <option selected value="SHA-256">SHA-256</option>
                 <option value="SHA-1">SHA-1</option>
                 <option value="SHA-384">SHA-384</option>
                 <option value="SHA-512">SHA-512</option>
             </select>
             <br/>
-            <select id="digestOutputFormat" class="button button-xsmall" style="text-align: left;">
+            <select id="digestOutputFormat">
                 <option selected value="hex">To HEX</option>
                 <option value="base64">To Base64</option>
             </select>
         </div>
 
         <div class="buttonGroup">
-            <input type="button" class="button button-xsmall" value="Compress"
+            <input type="button" value="Compress"
                 onclick="transform(trs.compress, {'compressAlgorithm': getCompressAlgorithm });" /><br />
-            <input type="button" class="button button-xsmall" value="Decompress"
+            <input type="button" value="Decompress"
                 onclick="transform(trs.decompress, {'compressAlgorithm': getCompressAlgorithm });" />
             <hr/>
-            <select id="compressAlgorithm" class="button button-xsmall" style="text-align: left;">
-                <option selected value="deflate">
-                    Deflate
-                </option>
-                <option value="deflate-raw">
-                    Deflate Raw
-                </option>
-                <option value="gzip">
-                    GZip
-                </option>
+            <select id="compressAlgorithm">
+                <option selected value="deflate">Deflate</option>
+                <option value="deflate-raw">Deflate Raw</option>
+                <option value="gzip">GZip</option>
             </select>
         </div>
 
         <div class="buttonGroup">
-            <input type="button" class="button button-xsmall" value="To UPPERCASE"
-                onclick="transform(trs.toUpperCase);" /><br />
-            <input type="button" class="button button-xsmall" value="To lowercase"
-                onclick="transform(trs.toLowerCase);" />
-            <!--TODO: to consider: camelCase, kebab-case, snake_case-->
+            <input type="button" value="To UPPERCASE" data-trs="toUpperCase" /><br />
+            <input type="button" value="To lowercase" data-trs="toLowerCase" />
         </div>
 
         <div class="buttonGroup">
-            <input type="button" class="button button-xsmall" value="Replicate"
+            <input type="button" value="Replicate"
                 onclick="transform(trs.replicate, {'getReplicateMode': getReplicateMode, 'getReplicatePlaceholder': getReplicatePlaceholder, 'getReplicateRangeStart': getReplicateRangeStart, 'getReplicateRangeEnd': getReplicateRangeEnd, 'getReplicateTemplateItems': getReplicateTemplateItems});" /><br/>
 
-            <select id="replicateMode" class="button button-xsmall"
-                style="text-align: left;" onchange="selectReplicateMode()">
+            <select id="replicateMode" onchange="selectReplicateMode()">
                 <option value="simple">Simple</option>
                 <option value="template">Template</option>
                 <option value="range">Ranged</option>
@@ -1929,14 +2410,14 @@
                 <br/>
 
                 <small>Placeholder</small> <input id="replicatePlaceholder" type="text" value="##" style="width:88px" />
-                <div class="overlay" style="position: fixed; top:0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; background-color: #000000bd; z-index: 1001; display: none;">
+                <div class="overlay">
                     <div style="position: relative; width: 500px; height: 700px; background-color: #909090; margin: auto;">
 
-                        <textarea id="replicateTemplateItemsBuilder" placeholder="items: one per line" style="height: 600px;"></textarea>
+                        <textarea id="replicateTemplateItemsBuilder" placeholder="items: one per line" style="height: 600px;" spellcheck="false"></textarea>
                 
                         <div style="margin: auto;align-items: center;display: flex;height: 100px;width: fit-content;">
-                            <button class="button button-xsmall" onclick="this.closest('.overlay').style.display='none'">Close</button>&nbsp;
-                            <button class="button button-xsmall" onclick="this.closest('.overlay').style.display='none'; selectReplicateTemplateItems()">OK</button>
+                            <button class="button" onclick="this.closest('.overlay').style.display='none'">Close</button>&nbsp;
+                            <button class="button" onclick="this.closest('.overlay').style.display='none'; selectReplicateTemplateItems()">OK</button>
                         </div>
                         
                     </div>
@@ -1946,9 +2427,9 @@
             
         </div>
         <div class="buttonGroup">
-            <input type="button" class="button button-xsmall" value="Sort lines"
+            <input type="button" value="Sort lines"
                 onclick="transform(trs.sort, {'isAscending': sortIsAscending });" /><br />
-            <input type="button" class="button button-xsmall" value="Sort JSON"
+            <input type="button" value="Sort JSON"
                 onclick="transform(trs.sortObject, {'isAscending': sortIsAscending, 'getPadding': formatWhitepacePadding });" />
             <br/>
             <label class="switch">
@@ -1960,20 +2441,15 @@
     <hr />
     <div>
         <div class="buttonGroup">
-            <input type="button" class="button button-xsmall" value="Clear"
-                onclick="clearValue();" /><br/>
-            <input type="button" class="button button-xsmall" value="Crop"
-                onclick="cropToSelection();" /><br/>
-            <input type="button" class="button button-xsmall" value="Save as..."
-                onclick="saveToFile();" />
+            <input type="button" value="Copy" onclick="copyValue();" /><br/>
+            <input type="button" value="Clear" onclick="clearValue();" /><br/>
+            <input type="button" value="Crop" onclick="cropToSelection();" /><br/>
+            <input type="button" value="Save as..." onclick="saveToFile();" />
         </div>
         <div class="buttonGroup">
-            <input type="button" class="button button-xsmall" value="New GUID"
-                onclick="generate(gens.generateGuid);" /><br/>
-            <input type="button" class="button button-xsmall" value="ISO DateTime"
-                onclick="generate(gens.isoDateTime);" /><br/>
-            <input type="button" class="button button-xsmall" value="Epoch"
-                onclick="generate(gens.epoch);" />
+            <input type="button" value="New GUID" data-gens="generateGuid" /><br/>
+            <input type="button" value="ISO DateTime" data-gens="isoDateTime" /><br/>
+            <input type="button" value="Epoch" data-gens="epoch" />
         </div>
 
         <div class="buttonGroup settingsGroup">
@@ -2010,14 +2486,12 @@
                 pattern="[\[\\\]\^_!&quot;#\$%&amp;'\(\)\*\+,-\.\/`:;&lt;=&gt;\?\{\|\}~]+" size="31"
                 placeholder="Special chars" disabled
                 onchange="generate(gens.randomString, { loadParams: getRandomStringParams });" />
-            <!--onkeyup for rndSpecialChars defined on page load-->
         </div>
 
         <div class="buttonGroup">
             <input type="text" id="replaceValue" placeholder="To replace..." style="margin: 4px 2px;" /><br/>
             <input type="text" id="replaceWith" placeholder="Replace with..." style="margin: 4px 2px;" /><br/>
-            <input type="button" class="button button-xsmall" value="Replace"
-                onclick="transform(trs.replace, {'isRegex': isReplaceRegex, 'replaceValue': getReplaceValue, 'replaceWith': getReplaceWith, 'all': getReplaceAll, 'caseSensitive': getReplaceCaseSensitive });" /><br/>
+            <input type="button" value="Replace" data-trs="replace" /><br/>
             <label class="off-on">
                 <input id="replaceAll" type="checkbox" checked />
                 <span class="off-on-slider round"></span>
@@ -2077,8 +2551,7 @@
         <!-- ...Preview... TODO [Set] [Insert] [Remove] -->
     </div>
     
-
-    <!--TODO add json tree viewer-->
+    <div id="objectTree" style="display: none;"></div>
     
 </body>
 

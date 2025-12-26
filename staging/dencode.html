@@ -1608,18 +1608,8 @@
                 cursorPos.start = start;
                 cursorPos.end = input.selectionEnd;
                 
-                let line = 1;
-                let lastNewLine = text.lastIndexOf('\n', start - 1);
-                const column = start - lastNewLine - 1;
-
-                let pos = lastNewLine;
-                while (pos !== -1) {
-                    line++;
-                    pos = text.lastIndexOf('\n', pos - 1);
-                }
-
-                cursorPos.line = line;
-                cursorPos.column = column;
+                cursorPos.line = text.substr(0, start).split("\n").length;
+                cursorPos.column = start - text.lastIndexOf('\n', start - 1) - 1;
                 return cursorPos;
             }
             else if (input.createTextRange) {
@@ -1641,16 +1631,8 @@
                     }
 
                     const text = input.value;
-                    let line = 1;
-                    let lastNewLine = -1;
-                    for (let i = 0; i < pos.start; i++) {
-                        if (text[i] === '\n') {
-                            line++;
-                            lastNewLine = i;
-                        }
-                    }
-                    pos.line = line;
-                    pos.column = pos.start - lastNewLine - 1;
+                    pos.line = text.substr(0, pos.start).split("\n").length;
+                    pos.column = pos.start - text.lastIndexOf('\n', pos.start - 1) - 1;
                     cursorPos = pos;
                     return cursorPos;
                 }
@@ -2295,7 +2277,7 @@
 <body>
     <textarea id="value" value="" placeholder="Text goes here..." autofocus ondrop="dropHandler(event);" spellcheck="false"></textarea>
     <div style="float: right; position: relative; font-size: small; margin-top: 0.2rem; display: grid; grid-template-columns: 1fr 1fr; column-gap: 0.5rem; row-gap: 0.1rem; text-align: end;" >
-        <div>Line: <span id="line"></span></div><div>Column: </span><span id="col"></span></div>
+        <div>Line: <span id="line"></span></div><div>Column: <span id="col"></span></div>
         <div>Start: <span id="start"></span></div><div>End: <span id="end"></span></div>
         <div>Selection: <span id="selection"></span></div><div>Length: <span id="length"></span></div>
     </div>

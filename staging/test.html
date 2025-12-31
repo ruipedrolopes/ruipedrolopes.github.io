@@ -28,15 +28,6 @@
             overflow-y: auto;
         }
         .hidden { display: none; }
-        
-        /* Column Widths */
-        th:nth-child(1) { width: 15%; } /* Variant */
-        th:nth-child(2) { width: 25%; } /* Input */
-        th:nth-child(3) { width: 25%; } /* Expected */
-        th:nth-child(4) { width: 25%; } /* Actual */
-        th:nth-child(5) { width: 10%; } /* Status */
-
-        /* Grouping Styles */
         tr.category-header th { background: #444; color: orange; font-size: 1.1em; text-align: left; padding-top: 20px; padding-left: 12px; }
         tr.feature-header th { background: #333; color: #ccc; padding-left: 24px; font-style: italic; font-weight: normal; }
         tr.test-row td:first-child { padding-left: 48px; color: #aaa; }
@@ -60,7 +51,6 @@
         <tbody id="testResults"></tbody>
     </table>
 
-    <!-- Mock elements required by dencode.html logic -->
     <div class="hidden">
         <textarea id="value"></textarea>
         <div id="message"><span id="messageType"></span><span id="messageText"></span></div>
@@ -69,12 +59,15 @@
         <input type="checkbox" id="xmlSafe" checked>
         <input type="checkbox" id="sortDescending">
         <select id="formattingLang"></select>
-        <select id="selectionMode"></select>
+        <select id="selectionMode">
+            <option value="full">Full Text</option>
+            <option value="selection">Selection Only</option>
+            <option value="lines">Per-Line</option>
+        </select>
         <input type="checkbox" id="cbCopy">
     </div>
 
     <script>
-        // 1. Mock standard UI functions to prevent errors during logic execution
         window.getValueElement = () => document.getElementById('value');
         window.flashValue = () => {};
         window.fetchData = () => {};
@@ -84,25 +77,16 @@
         
         async function runSuite() {
             try {
-                // 2. Fetch dencode.html
                 const response = await fetch('dencode.html');
                 const html = await response.text();
-                
-                // 3. Extract and execute scripts
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
                 const scripts = doc.querySelectorAll('script');
-                
-                // Concatenate all script content
                 let scriptContent = "";
                 scripts.forEach(s => scriptContent += s.textContent + "\n");
-
-                // Execute logic. trs, gens, auxiliary should become available globally.
                 const scriptEl = document.createElement('script');
                 scriptEl.textContent = scriptContent;
                 document.head.appendChild(scriptEl);
-
-                // Start testing
                 await executeTests();
             } catch (e) {
                 document.getElementById('summary').innerText = "Error loading dencode.html: " + e.message;
@@ -111,7 +95,6 @@
         }
 
         const results = [];
-        // Deep comparison for objects/arrays
         function deepCompare(a, b) {
             if (a === b) return true;
             if (typeof a !== typeof b) return false;
@@ -129,7 +112,6 @@
             return false;
         }
 
-        // Refactored assert to be resilient
         async function assert(category, feature, variant, input, expected, testFn) {
             let actual;
             let passed = false;
@@ -151,8 +133,7 @@
             const container = document.getElementById('testResults');
             container.innerHTML = "";
             results.length = 0;
-            
-            // --- DATA SETS ---
+
             const simpleObj = { a: 1 };
             const complexObj = {
                 string: "Hello World! @#$%^&*()",
@@ -165,230 +146,149 @@
             };
             const simpleJson = JSON.stringify(simpleObj);
             const complexJson = JSON.stringify(complexObj);
-            const complexYaml = auxiliary.objectToYaml(complexObj);
-            const expectedRoundtrip = JSON.parse(JSON.stringify(complexObj));
-
-            // --- TEST CASES ---
-
-            // Category 1: Selection & Line Modes
-            await assert("Modes", "Selection Mode", "Partial UPPER", "abc def", "BC D", async () => {
-                const el = getValueElement();
-                el.value = "abc def";
-                window.cursorPos = { start: 1, end: 5 }; // "bc d"
-                document.getElementById('selectionMode').value = "selection";
-                document.getElementById('cbCopy').checked = false;
-                let result;
-                window.displayResult = (r) => { result = r; };
-                await transform(trs.toUpperCase);
-                return result;
-            });
-
-            await assert("Modes", "Lines Mode", "Per-line URL", "a b\nc d", "a%20b\nc%20d", async () => {
-                getValueElement().value = "a b\nc d";
-                document.getElementById('selectionMode').value = "lines";
-                let result;
-                window.displayResult = (r) => { result = r; };
-                await transform(trs.urlencode);
-                return result;
-            });
-
-            // Auxiliary
-            await assert("Auxiliary", "isBase64", "Valid simple", "SGVsbG8=", true, () => auxiliary.isBase64("SGVsbG8="));
-            await assert("Auxiliary", "isBase64", "Invalid chars", "Not Base64!", false, () => auxiliary.isBase64("Not Base64!"));
-            await assert("Auxiliary", "isBase64", "With + and /", "abc+", true, () => auxiliary.isBase64("abc+")); 
-            await assert("Auxiliary", "isBase64", "Invalid length", "abc", false, () => auxiliary.isBase64("abc"));
-            await assert("Auxiliary", "isBase64", "Padding check", "SGVsbG8=", true, () => auxiliary.isBase64("SGVsbG8="));
-
-            await assert("Auxiliary", "isHex", "Valid lowercase", "deadbeef", true, () => auxiliary.isHex("deadbeef"));
-            await assert("Auxiliary", "isHex", "Valid uppercase", "DEADBEEF", true, () => auxiliary.isHex("DEADBEEF"));
-            await assert("Auxiliary", "isHex", "Invalid chars", "zzzz", false, () => auxiliary.isHex("zzzz"));
-            await assert("Auxiliary", "isHex", "Odd length", "ABC", false, () => auxiliary.isHex("ABC"));
-
-            await assert("Auxiliary", "isJson", "Simple object", simpleJson, true, () => auxiliary.isJson(simpleJson).valid);
-            await assert("Auxiliary", "isJson", "Complex object", complexJson, true, () => auxiliary.isJson(complexJson).valid);
-            await assert("Auxiliary", "isJson", "Invalid", "not json", false, () => auxiliary.isJson("not json"));
-
-            await assert("Auxiliary", "isXml", "Valid simple", "<root/>", true, () => auxiliary.isXml("<root/>"));
-            await assert("Auxiliary", "isXml", "Complex with attrs", '<root id="1">text<child/></root>', true, () => auxiliary.isXml('<root id="1">text<child/></root>'));
-            await assert("Auxiliary", "isXml", "Invalid", "<root", "object", () => typeof auxiliary.isXml("<root"));
-
-            await assert("Auxiliary", "isYaml", "Simple indicator", "key: value", true, () => auxiliary.isYaml("key: value"));
-            await assert("Auxiliary", "isYaml", "List indicator", "- item", true, () => auxiliary.isYaml("- item"));
-            
-            const yamlLiteral = "multiline: |\n  Line 1\n  Line 2";
-            await assert("Auxiliary", "isYaml", "Literal Block (|)", yamlLiteral, {multiline: "Line 1\nLine 2"}, () => auxiliary.yamlToObject(yamlLiteral));
-            
-            const yamlFolded = "multiline: >\n  Line 1\n  Line 2";
-            await assert("Auxiliary", "isYaml", "Folded Block (>)", yamlFolded, {multiline: "Line 1 Line 2"}, () => auxiliary.yamlToObject(yamlFolded));
-            
-            const yamlQuoted = 'multiline: "Line 1\\nLine 2"';
-            await assert("Auxiliary", "isYaml", "Double Quoted", yamlQuoted, {multiline: "Line 1\nLine 2"}, () => auxiliary.yamlToObject(yamlQuoted));
-            
-            const yamlSimple = "key: value\nlist:\n  - item1\n  - item2";
-            await assert("Auxiliary", "isYaml", "No Multiline", yamlSimple, {key: "value", list: ["item1", "item2"]}, () => auxiliary.yamlToObject(yamlSimple));
-
-            const complexValidYaml = [
-                'string: "Hello World! @#$%^&*()"',
-                'number: -123.456',
-                'boolean: true',
-                'empty: null',
-                'array:',
-                '  - 1',
-                '  - "two"',
-                '  - nested: true',
-                '  - - 4',
-                '    - 5',
-                'object:',
-                '  a: 1',
-                '  b:',
-                '    c: 2',
-                'multiline: |',
-                '  Line 1',
-                '  Line 2',
-                '  Line 3'
-            ].join('\n');
-            
-            await assert("Auxiliary", "isYaml", "Complex Valid YAML", complexValidYaml, complexObj, () => auxiliary.yamlToObject(complexValidYaml));
-
-            const uuid = auxiliary.uuidv4();
-            await assert("Auxiliary", "uuidv4", "Format check", uuid, true, () => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid));
-
-            // Transformers
-            
-            // URL
-            await assert("Transformers", "URL Encode", "Basic", "hello world", "hello%20world", () => trs.urlencode("hello world"));
-            await assert("Transformers", "URL Encode", "Complex chars", "a + b & c = d?", "a%20%2B%20b%20%26%20c%20%3D%20d%3F", () => trs.urlencode("a + b & c = d?"));
-            await assert("Transformers", "URL Decode", "Basic", "hello%20world", "hello world", () => trs.urldecode("hello%20world"));
-            await assert("Transformers", "URL Decode", "Complex chars", "a%20%2B%20b%20%26%20c%20%3D%20d%3F", "a + b & c = d?", () => trs.urldecode("a%20%2B%20b%20%26%20c%20%3D%20d%3F"));
-
-            // Base64
-            await assert("Transformers", "Base64 Encode", "Simple", "Hello", "SGVsbG8=", () => trs.base64encode("Hello"));
-            await assert("Transformers", "Base64 Encode", "UTF-8 Symbols", "Hello! \u20ac100", "SGVsbG8hIOKCrDEwMA==", () => trs.base64encode("Hello! \u20ac100"));
-            await assert("Transformers", "Base64 Encode", "UTF-8 Acute", "Ol\u00e1", "T2zDoQ==", () => trs.base64encode("Ol\u00e1"));
-            await assert("Transformers", "Base64 Decode", "UTF-8 Acute", "T2zDoQ==", "Ol\u00e1", () => trs.base64decode("T2zDoQ=="));
-            await assert("Transformers", "Base64 Decode", "UTF-8 Grave", "T2zDoA==", "Ol\u00e0", () => trs.base64decode("T2zDoA=="));
-
-            // Hex
-            await assert("Transformers", "Hex Encode", "Simple", "ABC", "414243", () => trs.hexencode("ABC"));
-            await assert("Transformers", "Hex Encode", "Special", "\n\t", "0a09", () => trs.hexencode("\n\t"));
-            await assert("Transformers", "Hex Decode", "Simple", "414243", "ABC", () => trs.hexdecode("414243"));
-
-            // HTML
-            await assert("Transformers", "HTML Encode", "Simple tag", "<div>", "&lt;div&gt;", () => trs.htmlencode("<div>"));
-            await assert("Transformers", "HTML Encode 2", "Entities & Symbols", "\u00e1 \u00a9 \u00ae", "&aacute; &#x00a9; &#x00ae;", () => trs.htmlencode2("\u00e1 \u00a9 \u00ae", {xmlSafe: () => false}));
-            await assert("Transformers", "HTML Encode 2", "XML Safe", "\u00e1", "&#x00e1;", () => trs.htmlencode2("\u00e1", {xmlSafe: () => true}));
-            await assert("Transformers", "HTML Decode", "Complex", "&lt;div class=\"test\"&gt;&amp;&lt;/div&gt;", "<div class=\"test\">&</div>", () => trs.htmldecode("&lt;div class=\"test\"&gt;&amp;&lt;/div&gt;"));
-            
-            // Original C-Like Tests
             const complexEscapeInput = 'Line 1\nLine 2\t"Quote" \\Backslash\\' ;
-            const complexEscapeExpected = 'Line 1\\nLine 2\\t\\\"Quote\\" \\\\Backslash\\\\' ;
+            const complexEscapeExpected = 'Line 1\\nLine 2\\t\\\"Quote\\" \\\\Backslash\\\\';
+            const cTypeExpected = '\"Line 1\\n\"\n+ \"Line 2\\t\\\"Quote\\\" \\\\Backslash\\\\\"';
+
+            const SUITE = {
+                "Modes": [
+                    { feature: "Selection Mode", variant: "Partial UPPER", input: "abc def", expected: "BC D", run: async (i) => {
+                        const el = getValueElement();
+                        el.value = i;
+                        cursorPos = { start: 1, end: 5 };
+                        document.getElementById('selectionMode').value = "selection";
+                        let res;
+                        window.displayResult = (r) => { res = r; };
+                        await transform(trs.toUpperCase);
+                        return res;
+                    }},
+                    { feature: "Lines Mode", variant: "Per-line URL", input: "a b\nc d", expected: "a%20b\nc%20d", run: async (i) => {
+                        const el = getValueElement();
+                        el.value = i;
+                        document.getElementById('selectionMode').value = "lines";
+                        let res;
+                        window.displayResult = (r) => { res = r; };
+                        await transform(trs.urlencode);
+                        return res;
+                    }}
+                ],
+                "Auxiliary": [
+                    { feature: "isBase64", variant: "Valid simple", input: "SGVsbG8=", expected: true, run: (i) => auxiliary.isBase64(i) },
+                    { feature: "isBase64", variant: "Invalid chars", input: "Not Base64!", expected: false, run: (i) => auxiliary.isBase64(i) },
+                    { feature: "isBase64", variant: "With + and /", input: "abc+", expected: true, run: (i) => auxiliary.isBase64(i) },
+                    { feature: "isBase64", variant: "Invalid length", input: "abc", expected: false, run: (i) => auxiliary.isBase64(i) },
+                    { feature: "isBase64", variant: "Padding check", input: "SGVsbG8=", expected: true, run: (i) => auxiliary.isBase64(i) },
+                    { feature: "isHex", variant: "Valid lowercase", input: "deadbeef", expected: true, run: (i) => auxiliary.isHex(i) },
+                    { feature: "isHex", variant: "Valid uppercase", input: "DEADBEEF", expected: true, run: (i) => auxiliary.isHex(i) },
+                    { feature: "isHex", variant: "Invalid chars", input: "zzzz", expected: false, run: (i) => auxiliary.isHex(i) },
+                    { feature: "isHex", variant: "Odd length", input: "ABC", expected: false, run: (i) => auxiliary.isHex(i) },
+                    { feature: "isJson", variant: "Simple object", input: simpleJson, expected: true, run: (i) => auxiliary.isJson(i).valid },
+                    { feature: "isJson", variant: "Complex object", input: complexJson, expected: true, run: (i) => auxiliary.isJson(i).valid },
+                    { feature: "isJson", variant: "Invalid", input: "not json", expected: false, run: (i) => auxiliary.isJson(i) },
+                    { feature: "isXml", variant: "Valid simple", input: "<root/>", expected: true, run: (i) => auxiliary.isXml(i) },
+                    { feature: "isXml", variant: "Complex with attrs", input: '<root id="1">text<child/></root>', expected: true, run: (i) => auxiliary.isXml(i) },
+                    { feature: "isXml", variant: "Invalid", input: "<root", expected: "object", run: (i) => typeof auxiliary.isXml(i) },
+                    { feature: "isYaml", variant: "Simple indicator", input: "key: value", expected: true, run: (i) => auxiliary.isYaml(i) },
+                    { feature: "isYaml", variant: "List indicator", input: "- item", expected: true, run: (i) => auxiliary.isYaml(i) },
+                    { feature: "isYaml", variant: "Literal Block (|)", input: "multiline: |\n  Line 1\n  Line 2", expected: {multiline: "Line 1\nLine 2"}, run: (i) => auxiliary.yamlToObject(i) },
+                    { feature: "isYaml", variant: "Folded Block ( >)", input: "multiline: >\n  Line 1\n  Line 2", expected: {multiline: "Line 1 Line 2"}, run: (i) => auxiliary.yamlToObject(i) },
+                    { feature: "isYaml", variant: "No Multiline", input: "key: value\nlist:\n  - item1\n  - item2", expected: {key: "value", list: ["item1", "item2"]}, run: (i) => auxiliary.yamlToObject(i) },
+                    { feature: "isYaml", variant: "Complex Valid YAML", input: [
+                        'string: "Hello World! @#$%^&*()"', 'number: -123.456', 'boolean: true', 'empty: null',
+                        'array:', '  - 1', '  - "two"', '  - nested: true', '  - - 4',
+                        '    - 5',
+                        'object:', '  a: 1', '  b:', '    c: 2', 'multiline: |',
+                        '  Line 1', '  Line 2', '  Line 3'
+                    ].join('\n'), expected: complexObj, run: (i) => auxiliary.yamlToObject(i) },
+                    { feature: "uuidv4", variant: "Format check", input: "(generated)", expected: true, run: () => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(auxiliary.uuidv4()) }
+                ],
+                "Transformers": [
+                    { feature: "URL Encode", variant: "Basic", input: "hello world", expected: "hello%20world", run: (i) => trs.urlencode(i) },
+                    { feature: "URL Encode", variant: "Complex chars", input: "a + b & c = d?", expected: "a%20%2B%20b%20%26%20c%20%3D%20d%3F", run: (i) => trs.urlencode(i) },
+                    { feature: "URL Decode", variant: "Basic", input: "hello%20world", expected: "hello world", run: (i) => trs.urldecode(i) },
+                    { feature: "URL Decode", variant: "Complex chars", input: "a%20%2B%20b%20%26%20c%20%3D%20d%3F", expected: "a + b & c = d?", run: (i) => trs.urldecode(i) },
+                    { feature: "Base64 Encode", variant: "Simple", input: "Hello", expected: "SGVsbG8=", run: (i) => trs.base64encode(i) },
+                    { feature: "Base64 Encode", variant: "UTF-8 Symbols", input: "Hello! \u20ac100", expected: "SGVsbG8hIOKCrDEwMA==", run: (i) => trs.base64encode(i) },
+                    { feature: "Base64 Encode", variant: "UTF-8 Acute", input: "Ol\u00e1", expected: "T2zDoQ==", run: (i) => trs.base64encode(i) },
+                    { feature: "Base64 Decode", variant: "UTF-8 Acute", input: "T2zDoQ==", expected: "Ol\u00e1", run: (i) => trs.base64decode(i) },
+                    { feature: "Base64 Decode", variant: "UTF-8 Grave", input: "T2zDoA==", expected: "Ol\u00e0", run: (i) => trs.base64decode(i) },
+                    { feature: "Hex Encode", variant: "Simple", input: "ABC", expected: "414243", run: (i) => trs.hexencode(i) },
+                    { feature: "Hex Encode", variant: "Special", input: "\n\t", expected: "0a09", run: (i) => trs.hexencode(i) },
+                    { feature: "Hex Decode", variant: "Simple", input: "414243", expected: "ABC", run: (i) => trs.hexdecode(i) },
+                    { feature: "HTML Encode", variant: "Simple tag", input: "<div>", expected: "&lt;div&gt;", run: (i) => trs.htmlencode(i) },
+                    { feature: "HTML Encode 2", variant: "Entities & Symbols", input: "\u00e1 \u00a9 \u00ae", expected: "&aacute; &#x00a9; &#x00ae;", run: (i) => trs.htmlencode2(i, {xmlSafe: () => false}) },
+                    { feature: "HTML Encode 2", variant: "XML Safe", input: "\u00e1", expected: "&#x00e1;", run: (i) => trs.htmlencode2(i, {xmlSafe: () => true}) },
+                    { feature: "HTML Decode", variant: "Complex", input: "&lt;div class=\"test\"&gt;&amp;&lt;/div&gt;", expected: "<div class=\"test\">&</div>", run: (i) => trs.htmldecode(i) },
+                    { feature: "C-Like Escape", variant: "Simple (Truthful)", input: 'A"B', expected: 'A\\"B', run: (i) => trs.CLikeLang_StringEscape(i) },
+                    { feature: "C-Like Escape", variant: "Complex (Truthful)", input: complexEscapeInput, expected: complexEscapeExpected, run: (i) => trs.CLikeLang_StringEscape(i) },
+                    { feature: "C-Like Unescape", variant: "Complex (Truthful)", input: complexEscapeExpected, expected: complexEscapeInput, run: (i) => trs.CLikeLang_StringUnescape(complexEscapeExpected) },
+                    { feature: "C-Like Roundtrip", variant: "Unstringify", input: complexEscapeInput, expected: complexEscapeInput, run: (i) => trs.CTypeLang_Unstringify(trs.CTypeLang_Stringify(i)) },
+                    { feature: "Case Conversion", variant: "UPPER", input: "abc", expected: "ABC", run: (i) => trs.toUpperCase(i) },
+                    { feature: "Case Conversion", variant: "lower", input: "ABC", expected: "abc", run: (i) => trs.toLowerCase(i) },
+                    { feature: "C-Type Stringify", variant: "Simple", input: "A", expected: '"A"', run: (i) => trs.CTypeLang_Stringify(i) },
+                    { feature: "C-Type Stringify", variant: "Multi-line with tabs", input: complexEscapeInput, expected: cTypeExpected, run: (i) => trs.CTypeLang_Stringify(i) },
+                    { feature: "Pretty Print", variant: "JSON Simple", input: simpleJson, expected: JSON.stringify(simpleObj, null, '  '), run: (i) => trs.prettyPrint(i, {getPadding:()=>'  ', getFormatingLang:()=>'JSON'}) },
+                    { feature: "Pretty Print", variant: "JSON Complex", input: complexJson, expected: JSON.stringify(complexObj, null, '  '), run: (i) => trs.prettyPrint(complexJson, {getPadding:()=>'  ', getFormatingLang:()=>'JSON'}) },
+                    { feature: "Minify", variant: "JSON Complex", input: JSON.stringify(complexObj, null, 4), expected: complexJson, run: (i) => trs.minify(i, {getFormatingLang:()=>'JSON'}) },
+                    { feature: "Pretty Print", variant: "XML Simple", input: "<root><child/></root>", expected: '<root>\n  <child/>\n</root>', run: (i) => trs.prettyPrint(i, {getPadding:()=>'  ', getFormatingLang:()=>'XML'}) },
+                    { feature: "Pretty Print", variant: "YAML Simple", input: "a: 1\nb: 2", expected: "a: 1\nb: 2", run: (i) => trs.prettyPrint(i, {getPadding:()=>'  ', getFormatingLang:()=>'YAML'}) },
+                    { feature: "Replicate", variant: "Simple", input: "A", expected: "AA", run: (i) => trs.replicate(i, {getReplicateMode:()=>"simple"}) },
+                    { feature: "Replicate", variant: "Template", input: "ID: ##", expected: "ID: AID: B", run: (i) => trs.replicate(i, {getReplicateMode:()=>"template", getReplicatePlaceholder:()=>"##", getReplicateTemplateItems:()=>["A", "B"]}) },
+                    { feature: "Replicate", variant: "Range", input: "## ", expected: "1 2 3 ", run: (i) => trs.replicate(i, {getReplicateMode:()=>"range", getReplicatePlaceholder:()=>"##", getReplicateRangeStart:()=>1, getReplicateRangeEnd:()=>3}) },
+                    { feature: "Sort", variant: "Simple", input: "b\na", expected: "a\nb", run: (i) => trs.sort(i, {isAscending:()=>true}) },
+                    { feature: "Sort JSON", variant: "Keys Asc", input: '{"b":1,"a":2}', expected: '{"a":2,"b":1}', run: (i) => trs.sortObject(i, {isAscending:()=>true, getPadding:()=>''}) },
+                    { feature: "Replace", variant: "Simple All", input: "line 1", expected: "row 1", run: (i) => {
+                        window.getReplaceValue = () => "line"; window.getReplaceWith = () => "row"; window.getReplaceAll = () => true;
+                        window.getReplaceCaseSensitive = () => false; window.isReplaceRegex = () => false; window.getReplaceEscaped = () => false;
+                        return trs.replace(i);
+                    }}
+                ],
+                "Category 2: Variants": [
+                    { feature: "Compress", variant: "Deflate", input: "hello", expected: "eJzLSM3JyQcABiwCFQ==", run: async (i) => await trs.compress(i, {compressAlgorithm:()=>"deflate"}) },
+                    { feature: "Compress", variant: "Deflate Raw", input: "hello", expected: "y0jNyckHAA==", run: async (i) => await trs.compress(i, {compressAlgorithm:()=>"deflate-raw"}) },
+                    { feature: "Compress", variant: "GZip", input: "hello", expected: "H4sIAAAAAAAACstIzcnJBwCGphA2BQAAAA==", run: async (i) => await trs.compress(i, {compressAlgorithm:()=>"gzip"}) },
+                    { feature: "Decompress", variant: "Deflate", input: "eJzLSM3JyQcABiwCFQ==", expected: "hello", run: async (i) => await trs.decompress(i, {compressAlgorithm:()=>"deflate"}) },
+                    { feature: "Decompress", variant: "Deflate Raw", input: "y0jNyckHAA==", expected: "hello", run: async (i) => await trs.decompress(i, {compressAlgorithm:()=>"deflate-raw"}) },
+                    { feature: "Decompress", variant: "GZip", input: "H4sIAAAAAAAACstIzcnJBwCGphA2BQAAAA==", expected: "hello", run: async (i) => await trs.decompress(i, {compressAlgorithm:()=>"gzip"}) },
+                    { feature: "Digest", variant: "SHA-256 Hex", input: "hello", expected: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", run: async (i) => await trs.digest(i, {digestAlgorithm:()=>"SHA-256", digestOutputFormat:()=>"hex"}) },
+                    { feature: "Digest", variant: "SHA-1 Base64", input: "hello", expected: "qvTGHdzF6KLavt4PO0gs2a6pQ00=", run: async (i) => await trs.digest(i, {digestAlgorithm:()=>"SHA-1", digestOutputFormat:()=>"base64"}) },
+                    { feature: "Digest", variant: "SHA-384 Base64", input: "hello", expected: "WeF0h3dEjGnea4ANejO7+5/xtGPkQ1TDVTvNucZm+pASWjx5+QOXvfX2oT3oKGhP", run: async (i) => await trs.digest(i, {digestAlgorithm:()=>"SHA-384", digestOutputFormat:()=>"base64"}) },
+                    { feature: "Digest", variant: "SHA-512 Hex", input: "hello", expected: "9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043", run: async (i) => await trs.digest(i, {digestAlgorithm:()=>"SHA-512", digestOutputFormat:()=>"hex"}) }
+                ],
+                "Category 3: Generators": [
+                    { feature: "Epoch", variant: "Type check", input: "(current time)", expected: "number", run: () => typeof Number.parseInt(gens.epoch()) },
+                    { feature: "ISO DateTime", variant: "Format check (Regex)", input: "(now)", expected: true, run: () => /\d{4}-\d{2}-\d{2}T/.test(gens.isoDateTime()) },
+                    { feature: "Random String", variant: "Simple Lower", input: "length 5", expected: true, run: () => {
+                        const rnd = gens.randomString({loadParams:()=>({length:5, lower:true, upper:false, digits:false, special:false})});
+                        return rnd.length === 5 && /^[a-z]+$/.test(rnd);
+                    }},
+                    { feature: "Random String", variant: "UPPER and Digits", input: "length 10", expected: true, run: () => {
+                        const rnd = gens.randomString({loadParams:()=>({length:10, lower:false, upper:true, digits:true, special:false})});
+                        return rnd.length === 10 && /^[A-Z0-9]+$/.test(rnd);
+                    }},
+                    { feature: "Random String", variant: "Custom Special", input: "chars: !@", expected: true, run: () => {
+                        const rnd = gens.randomString({loadParams:()=>({length:10, lower:false, upper:false, digits:false, special:true, specialChars:"!@"})});
+                        return /^[!@]+$/.test(rnd);
+                    }}
+                ]
+            };
+
+            for (const [category, tests] of Object.entries(SUITE)) {
+                for (const t of tests) {
+                    await assert(category, t.feature, t.variant, t.input, t.expected, () => t.run(t.input));
+                }
+            }
+            renderSummary();
+        }
+
+        function renderSummary() {
+            const passedCount = results.filter(r => r.passed).length;
+            const summary = document.getElementById('summary');
+            summary.innerText = `${passedCount} / ${results.length} Tests Passed`;
+            summary.className = "summary " + (passedCount === results.length ? "pass" : "fail");
             
-            await assert("Transformers", "C-Like Escape", "Simple", 'A"B', 'A\\"B', () => trs.CLikeLang_StringEscape('A"B'));
-            await assert("Transformers", "C-Like Escape", "Complex", complexEscapeInput, complexEscapeExpected, () => trs.CLikeLang_StringEscape(complexEscapeInput));
-            await assert("Transformers", "C-Like Unescape", "Complex", complexEscapeExpected, complexEscapeInput, () => trs.CLikeLang_StringUnescape(complexEscapeExpected));
-            
-            // Category 4: UI Utilities
-            await assert("Transformers", "Case Conversion", "UPPER", "abc", "ABC", () => trs.toUpperCase("abc"));
-            await assert("Transformers", "Case Conversion", "lower", "ABC", "abc", () => trs.toLowerCase("ABC"));
-
-            // C-Type Formatting
-            const cTypeExpected = '"Line 1\\n"\n+ "Line 2\\t\\"Quote\\" \\\\Backslash\\\\"';
-            await assert("Transformers", "C-Type Stringify", "Simple", "A", '"A"', () => trs.CTypeLang_Stringify("A"));
-            await assert("Transformers", "C-Type Stringify", "Multi-line with tabs", complexEscapeInput, cTypeExpected, () => trs.CTypeLang_Stringify(complexEscapeInput));
-
-            // Pretty/Minify
-            await assert("Transformers", "Pretty Print", "JSON Simple", simpleJson, JSON.stringify(simpleObj, null, '  '), () => trs.prettyPrint(simpleJson, {getPadding:()=>'  ', getFormatingLang:()=>'JSON'}));
-            await assert("Transformers", "Pretty Print", "JSON Complex", complexJson, JSON.stringify(complexObj, null, '  '), () => trs.prettyPrint(complexJson, {getPadding:()=>'  ', getFormatingLang:()=>'JSON'}));
-            await assert("Transformers", "Minify", "JSON Complex", JSON.stringify(complexObj, null, 4), complexJson, () => trs.minify(JSON.stringify(complexObj, null, 4), {getFormatingLang:()=>'JSON'}));
-            await assert("Transformers", "Pretty Print", "XML Simple", "<root><child/></root>", '<root>\n  <child/>\n</root>', () => trs.prettyPrint("<root><child/></root>", {getPadding:()=>'  ', getFormatingLang:()=>'XML'}));
-            
-            const simpleYamlInput = "a: 1\nb: 2";
-            const simpleYamlExpected = "a: 1\nb: 2";
-            await assert("Transformers", "Pretty Print", "YAML Simple", simpleYamlInput, simpleYamlExpected, () => trs.prettyPrint(simpleYamlInput, {getPadding:()=>'  ', getFormatingLang:()=>'YAML'}));
-
-            // Replicate
-            await assert("Transformers", "Replicate", "Simple", "A", "AA", () => trs.replicate("A", {getReplicateMode:()=>"simple"}));
-            await assert("Transformers", "Replicate", "Template", "ID: ##", "ID: AID: B", () => trs.replicate("ID: ##", {
-                getReplicateMode:()=>"template", getReplicatePlaceholder:()=>"##", getReplicateTemplateItems:()=>["A", "B"]
-            }));
-            await assert("Transformers", "Replicate", "Range", "## ", "1 2 3 ", () => trs.replicate("## ", {
-                getReplicateMode:()=>"range", getReplicatePlaceholder:()=>"##", getReplicateRangeStart:()=>1, getReplicateRangeEnd:()=>3
-            }));
-
-            // Sort
-            await assert("Transformers", "Sort", "Simple", "b\na", "a\nb", () => trs.sort("b\na", {isAscending:()=>true}));
-            await assert("Transformers", "Sort", "Case & Numbers", "b\n1\na\n2", "1\n2\na\nb", () => trs.sort("b\n1\na\n2", {isAscending:()=>true}));
-            await assert("Transformers", "Sort JSON", "Keys Asc", '{"b":1,"a":2}', '{"a":2,"b":1}', () => trs.sortObject('{"b":1,"a":2}', {isAscending:()=>true, getPadding:()=>''}));
-            await assert("Transformers", "Sort JSON", "Keys Desc", '{"a":1,"b":2}', '{"b":2,"a":1}', () => trs.sortObject('{"a":1,"b":2}', {isAscending:()=>false, getPadding:()=>''}));
-
-            // Replace
-            await assert("Transformers", "Replace", "Simple All", "line 1", "row 1", () => {
-                window.getReplaceValue = () => "line"; window.getReplaceWith = () => "row"; window.getReplaceAll = () => true;
-                window.getReplaceCaseSensitive = () => false; window.isReplaceRegex = () => false;
-                window.getReplaceEscaped = () => false;
-                return trs.replace("line 1");
-            });
-            
-            await assert("Transformers", "Replace", "RegEx Backref", "aa bb cc", "a b c", () => {
-                window.getReplaceValue = () => "([a-z])\\1"; window.getReplaceWith = () => "$1"; window.getReplaceAll = () => true;
-                window.isReplaceRegex = () => true;
-                return trs.replace("aa bb cc");
-            });
-
-            await assert("Transformers", "Replace", "Escaped Replacement", "tab", "\t", () => {
-                window.getReplaceValue = () => "tab"; window.getReplaceWith = () => "\t"; window.getReplaceAll = () => true;
-                window.isReplaceRegex = () => false;
-                window.getReplaceEscaped = () => true;
-                return trs.replace("tab");
-            });
-
-            // Category 2: Transformer Variants
-            await assert("Transformers", "Compress", "Deflate", "hello", "string", async () => {
-                const compressed = await trs.compress("hello", {compressAlgorithm:()=>"deflate"});
-                return typeof compressed;
-            });
-            await assert("Transformers", "Compress", "Deflate Raw", "hello", "string", async () => {
-                const compressed = await trs.compress("hello", {compressAlgorithm:()=>"deflate-raw"});
-                return typeof compressed;
-            });
-            // Category 2: Transformer Variants
-            await assert("Transformers", "Digest", "SHA-256 Hex", "hello", "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", async () => {
-                return await trs.digest("hello", {digestAlgorithm:()=>"SHA-256", digestOutputFormat:()=>"hex"});
-            });
-            await assert("Transformers", "Digest", "SHA-1 Base64", "hello", "qvTGHdzF6KLavt4PO0gs2a6pQ00=", async () => {
-                return await trs.digest("hello", {digestAlgorithm:()=>"SHA-1", digestOutputFormat:()=>"base64"});
-            });
-            await assert("Transformers", "Digest", "SHA-384 Base64", "hello", "string", async () => {
-                const hash = await trs.digest("hello", {digestAlgorithm:()=>"SHA-384", digestOutputFormat:()=>"base64"});
-                return typeof hash === "string" && hash.length > 20;
-            });
-            await assert("Transformers", "Digest", "SHA-512 Hex", "hello", "string", async () => {
-                const hash = await trs.digest("hello", {digestAlgorithm:()=>"SHA-512", digestOutputFormat:()=>"hex"});
-                return typeof hash === "string" && hash.length === 128;
-            });
-
-            await assert("Transformers", "Compress", "Deflate", "hello", "string", async () => {
-                const compressed = await trs.compress("hello", {compressAlgorithm:()=>"deflate"});
-                return typeof compressed;
-            });
-            await assert("Transformers", "Compress", "Deflate Raw", "hello", "string", async () => {
-                const compressed = await trs.compress("hello", {compressAlgorithm:()=>"deflate-raw"});
-                return typeof compressed;
-            });
-
-            // Category 3: Generators
-            await assert("Generators", "Epoch", "Type check", "(current time)", "string", () => typeof gens.epoch());
-            await assert("Generators", "ISO DateTime", "Format check", "(now)", true, () => /\d{4}-\d{2}-\d{2}T/.test(gens.isoDateTime()));
-            await assert("Generators", "Random String", "Simple Lower", "length 5", true, () => {
-                const rnd = gens.randomString({loadParams:()=>({length:5, lower:true, upper:false, digits:false, special:false})});
-                return rnd.length === 5 && /^[a-z]+$/.test(rnd);
-            });
-
-            // --- RENDER RESULTS ---
-            let passedCount = 0;
-            let crashCount = 0;
-            
-            // Group by Category -> Feature
+            const container = document.getElementById('testResults');
+            container.innerHTML = "";
             const grouped = {};
             results.forEach(res => {
                 if (!grouped[res.category]) grouped[res.category] = {};
@@ -397,52 +297,29 @@
             });
 
             for (const category in grouped) {
-                // Category Header
                 const catRow = document.createElement('tr');
                 catRow.className = "category-header";
                 catRow.innerHTML = `<th colspan="5">${category}</th>`;
                 container.appendChild(catRow);
 
                 for (const feature in grouped[category]) {
-                    // Feature Header
                     const featRow = document.createElement('tr');
                     featRow.className = "feature-header";
                     featRow.innerHTML = `<th colspan="5">${feature}</th>`;
                     container.appendChild(featRow);
 
                     grouped[category][feature].forEach(res => {
-                        if (res.passed) passedCount++;
-                        if (res.crashed) crashCount++;
-                        
                         const tr = document.createElement('tr');
                         tr.className = "test-row";
-                        
                         let statusClass = res.passed ? 'status-pass' : 'status-fail';
-                        let statusText = res.passed ? 'PASS' : 'FAIL';
-                        if (res.crashed) {
-                            statusClass = 'status-crash';
-                            statusText = 'CRASH';
-                        }
-
-                        // Stringify objects for display
+                        if (res.crashed) statusClass = 'status-crash';
                         const displayActual = (typeof res.actual === 'object' && res.actual !== null) ? JSON.stringify(res.actual, null, 2) : String(res.actual);
                         const displayExpected = (typeof res.expected === 'object' && res.expected !== null) ? JSON.stringify(res.expected, null, 2) : String(res.expected);
-
-                        tr.innerHTML = `
-                            <td>${res.variant}</td>
-                            <td><pre>${escape(String(res.input))}</pre></td>
-                            <td><pre>${escape(displayExpected)}</pre></td>
-                            <td><pre>${escape(displayActual)}</pre></td>
-                            <td class="${statusClass}">${statusText}</td>
-                        `;
+                        tr.innerHTML = `<td>${res.variant}</td><td><pre>${escape(String(res.input))}</pre></td><td><pre>${escape(displayExpected)}</pre></td><td><pre>${escape(displayActual)}</pre></td><td class="${statusClass}">${res.passed ? 'PASS' : 'FAIL'}</td>`;
                         container.appendChild(tr);
                     });
                 }
             }
-
-            const summary = document.getElementById('summary');
-            summary.innerText = `${passedCount} / ${results.length} Tests Passed` + (crashCount > 0 ? ` (${crashCount} CRASHED)` : "");
-            summary.className = "summary " + (passedCount === results.length ? "pass" : "fail");
         }
 
         function escape(str) {

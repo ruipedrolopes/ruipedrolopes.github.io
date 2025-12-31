@@ -1,0 +1,52 @@
+name: Deploy Tools from Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Copy staging files to root
+        run: |
+          cp staging/dencode.html ./dencode.html
+          cp staging/compare.html ./compare.html
+          cp staging/dencrypt.html ./dencrypt.html
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add dencode.html compare.html dencrypt.html
+
+          # Only commit and push if there are changes
+          if ! git diff --staged --quiet; then
+            git commit -m "Deploy tools version ${{ inputs.version }}"
+            git push
+          else
+            echo "No changes detected in tools."
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Release v${{ inputs.version }}
+          body: |
+            ## Tools Updated
+          draft: false
+          prerelease: false
+          generate_release_notes: false

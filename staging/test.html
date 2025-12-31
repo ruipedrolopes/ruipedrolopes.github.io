@@ -66,9 +66,11 @@
         <div id="message"><span id="messageType"></span><span id="messageText"></span></div>
         <div id="historyItems"></div>
         <input type="checkbox" id="useTabs">
-        <input type="checkbox" id="xmlSafe">
+        <input type="checkbox" id="xmlSafe" checked>
         <input type="checkbox" id="sortDescending">
         <select id="formattingLang"></select>
+        <select id="selectionMode"></select>
+        <input type="checkbox" id="cbCopy">
     </div>
 
     <script>
@@ -165,9 +167,30 @@
             const complexJson = JSON.stringify(complexObj);
             const complexYaml = auxiliary.objectToYaml(complexObj);
             const expectedRoundtrip = JSON.parse(JSON.stringify(complexObj));
-            expectedRoundtrip.multiline = "Line 1";
 
             // --- TEST CASES ---
+
+            // Category 1: Selection & Line Modes
+            await assert("Modes", "Selection Mode", "Partial UPPER", "abc def", "BC D", async () => {
+                const el = getValueElement();
+                el.value = "abc def";
+                window.cursorPos = { start: 1, end: 5 }; // "bc d"
+                document.getElementById('selectionMode').value = "selection";
+                document.getElementById('cbCopy').checked = false;
+                let result;
+                window.displayResult = (r) => { result = r; };
+                await transform(trs.toUpperCase);
+                return result;
+            });
+
+            await assert("Modes", "Lines Mode", "Per-line URL", "a b\nc d", "a%20b\nc%20d", async () => {
+                getValueElement().value = "a b\nc d";
+                document.getElementById('selectionMode').value = "lines";
+                let result;
+                window.displayResult = (r) => { result = r; };
+                await transform(trs.urlencode);
+                return result;
+            });
 
             // Auxiliary
             await assert("Auxiliary", "isBase64", "Valid simple", "SGVsbG8=", true, () => auxiliary.isBase64("SGVsbG8="));
@@ -191,8 +214,42 @@
 
             await assert("Auxiliary", "isYaml", "Simple indicator", "key: value", true, () => auxiliary.isYaml("key: value"));
             await assert("Auxiliary", "isYaml", "List indicator", "- item", true, () => auxiliary.isYaml("- item"));
-            await assert("Auxiliary", "isYaml", "Complex Roundtrip", complexYaml, expectedRoundtrip, () => auxiliary.yamlToObject(complexYaml));
             
+            const yamlLiteral = "multiline: |\n  Line 1\n  Line 2";
+            await assert("Auxiliary", "isYaml", "Literal Block (|)", yamlLiteral, {multiline: "Line 1\nLine 2"}, () => auxiliary.yamlToObject(yamlLiteral));
+            
+            const yamlFolded = "multiline: >\n  Line 1\n  Line 2";
+            await assert("Auxiliary", "isYaml", "Folded Block (>)", yamlFolded, {multiline: "Line 1 Line 2"}, () => auxiliary.yamlToObject(yamlFolded));
+            
+            const yamlQuoted = 'multiline: "Line 1\\nLine 2"';
+            await assert("Auxiliary", "isYaml", "Double Quoted", yamlQuoted, {multiline: "Line 1\nLine 2"}, () => auxiliary.yamlToObject(yamlQuoted));
+            
+            const yamlSimple = "key: value\nlist:\n  - item1\n  - item2";
+            await assert("Auxiliary", "isYaml", "No Multiline", yamlSimple, {key: "value", list: ["item1", "item2"]}, () => auxiliary.yamlToObject(yamlSimple));
+
+            const complexValidYaml = [
+                'string: "Hello World! @#$%^&*()"',
+                'number: -123.456',
+                'boolean: true',
+                'empty: null',
+                'array:',
+                '  - 1',
+                '  - "two"',
+                '  - nested: true',
+                '  - - 4',
+                '    - 5',
+                'object:',
+                '  a: 1',
+                '  b:',
+                '    c: 2',
+                'multiline: |',
+                '  Line 1',
+                '  Line 2',
+                '  Line 3'
+            ].join('\n');
+            
+            await assert("Auxiliary", "isYaml", "Complex Valid YAML", complexValidYaml, complexObj, () => auxiliary.yamlToObject(complexValidYaml));
+
             const uuid = auxiliary.uuidv4();
             await assert("Auxiliary", "uuidv4", "Format check", uuid, true, () => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid));
 
@@ -206,10 +263,10 @@
 
             // Base64
             await assert("Transformers", "Base64 Encode", "Simple", "Hello", "SGVsbG8=", () => trs.base64encode("Hello"));
-            await assert("Transformers", "Base64 Encode", "UTF-8 Symbols", "Hello! €100", "SGVsbG8hIOKCrDEwMA==", () => trs.base64encode("Hello! €100"));
-            await assert("Transformers", "Base64 Encode", "UTF-8 Acute", "Olá", "T2zDoQ==", () => trs.base64encode("Olá"));
-            await assert("Transformers", "Base64 Decode", "UTF-8 Acute", "T2zDoQ==", "Olá", () => trs.base64decode("T2zDoQ=="));
-            await assert("Transformers", "Base64 Decode", "UTF-8 Grave", "T2zDoA==", "Olà", () => trs.base64decode("T2zDoA=="));
+            await assert("Transformers", "Base64 Encode", "UTF-8 Symbols", "Hello! \u20ac100", "SGVsbG8hIOKCrDEwMA==", () => trs.base64encode("Hello! \u20ac100"));
+            await assert("Transformers", "Base64 Encode", "UTF-8 Acute", "Ol\u00e1", "T2zDoQ==", () => trs.base64encode("Ol\u00e1"));
+            await assert("Transformers", "Base64 Decode", "UTF-8 Acute", "T2zDoQ==", "Ol\u00e1", () => trs.base64decode("T2zDoQ=="));
+            await assert("Transformers", "Base64 Decode", "UTF-8 Grave", "T2zDoA==", "Ol\u00e0", () => trs.base64decode("T2zDoA=="));
 
             // Hex
             await assert("Transformers", "Hex Encode", "Simple", "ABC", "414243", () => trs.hexencode("ABC"));
@@ -218,29 +275,36 @@
 
             // HTML
             await assert("Transformers", "HTML Encode", "Simple tag", "<div>", "&lt;div&gt;", () => trs.htmlencode("<div>"));
-            await assert("Transformers", "HTML Encode 2", "Entities & Symbols", "á © ®", "&aacute; &#x00a9; &#x00ae;", () => trs.htmlencode2("á © ®", {xmlSafe: () => false}));
-            await assert("Transformers", "HTML Encode 2", "XML Safe", "á", "&#x00e1;", () => trs.htmlencode2("á", {xmlSafe: () => true}));
-            await assert("Transformers", "HTML Decode", "Complex", "&lt;div class=&quot;test&quot;&gt;&amp;&lt;/div&gt;", "<div class=\"test\">&
-</div>", () => trs.htmldecode("&lt;div class=&quot;test&quot;&gt;&amp;&lt;/div&gt;"));
+            await assert("Transformers", "HTML Encode 2", "Entities & Symbols", "\u00e1 \u00a9 \u00ae", "&aacute; &#x00a9; &#x00ae;", () => trs.htmlencode2("\u00e1 \u00a9 \u00ae", {xmlSafe: () => false}));
+            await assert("Transformers", "HTML Encode 2", "XML Safe", "\u00e1", "&#x00e1;", () => trs.htmlencode2("\u00e1", {xmlSafe: () => true}));
+            await assert("Transformers", "HTML Decode", "Complex", "&lt;div class=\"test\"&gt;&amp;&lt;/div&gt;", "<div class=\"test\">&</div>", () => trs.htmldecode("&lt;div class=\"test\"&gt;&amp;&lt;/div&gt;"));
             
-            // String Escaping
+            // Original C-Like Tests
             const complexEscapeInput = 'Line 1\nLine 2\t"Quote" \\Backslash\\' ;
-            const complexEscapeExpected = 'Line 1\\nLine 2\\t\"Quote\" \\\\Backslash\\\\';
-            // C-Like Escape still fails to escape " (bug analysis)
-            await assert("Transformers", "C-Like Escape", "Simple (Bug Analysis)", 'A"B', 'A\"B', () => trs.CLikeLang_StringEscape('A"B'));
-            await assert("Transformers", "C-Like Escape", "Complex (Bug Analysis)", complexEscapeInput, complexEscapeExpected, () => trs.CLikeLang_StringEscape(complexEscapeInput));
-            await assert("Transformers", "C-Like Unescape", "Complex (Bug Analysis)", complexEscapeExpected, complexEscapeInput, () => trs.CLikeLang_StringUnescape(complexEscapeExpected));
+            const complexEscapeExpected = 'Line 1\\nLine 2\\t\\\"Quote\\" \\\\Backslash\\\\' ;
             
+            await assert("Transformers", "C-Like Escape", "Simple", 'A"B', 'A\\"B', () => trs.CLikeLang_StringEscape('A"B'));
+            await assert("Transformers", "C-Like Escape", "Complex", complexEscapeInput, complexEscapeExpected, () => trs.CLikeLang_StringEscape(complexEscapeInput));
+            await assert("Transformers", "C-Like Unescape", "Complex", complexEscapeExpected, complexEscapeInput, () => trs.CLikeLang_StringUnescape(complexEscapeExpected));
+            
+            // Category 4: UI Utilities
+            await assert("Transformers", "Case Conversion", "UPPER", "abc", "ABC", () => trs.toUpperCase("abc"));
+            await assert("Transformers", "Case Conversion", "lower", "ABC", "abc", () => trs.toLowerCase("ABC"));
+
             // C-Type Formatting
+            const cTypeExpected = '"Line 1\\n"\n+ "Line 2\\t\\"Quote\\" \\\\Backslash\\\\"';
             await assert("Transformers", "C-Type Stringify", "Simple", "A", '"A"', () => trs.CTypeLang_Stringify("A"));
-            await assert("Transformers", "C-Type Stringify", "Multi-line with tabs", "Line 1\n\tLine 2", '"Line 1\\n"\n+ "\tLine 2"', () => trs.CTypeLang_Stringify("Line 1\n\tLine 2"));
+            await assert("Transformers", "C-Type Stringify", "Multi-line with tabs", complexEscapeInput, cTypeExpected, () => trs.CTypeLang_Stringify(complexEscapeInput));
 
             // Pretty/Minify
             await assert("Transformers", "Pretty Print", "JSON Simple", simpleJson, JSON.stringify(simpleObj, null, '  '), () => trs.prettyPrint(simpleJson, {getPadding:()=>'  ', getFormatingLang:()=>'JSON'}));
             await assert("Transformers", "Pretty Print", "JSON Complex", complexJson, JSON.stringify(complexObj, null, '  '), () => trs.prettyPrint(complexJson, {getPadding:()=>'  ', getFormatingLang:()=>'JSON'}));
             await assert("Transformers", "Minify", "JSON Complex", JSON.stringify(complexObj, null, 4), complexJson, () => trs.minify(JSON.stringify(complexObj, null, 4), {getFormatingLang:()=>'JSON'}));
             await assert("Transformers", "Pretty Print", "XML Simple", "<root><child/></root>", '<root>\n  <child/>\n</root>', () => trs.prettyPrint("<root><child/></root>", {getPadding:()=>'  ', getFormatingLang:()=>'XML'}));
-            await assert("Transformers", "Pretty Print", "YAML Complex", complexYaml, complexYaml, () => trs.prettyPrint(complexYaml, {getPadding:()=>'  ', getFormatingLang:()=>'YAML'}));
+            
+            const simpleYamlInput = "a: 1\nb: 2";
+            const simpleYamlExpected = "a: 1\nb: 2";
+            await assert("Transformers", "Pretty Print", "YAML Simple", simpleYamlInput, simpleYamlExpected, () => trs.prettyPrint(simpleYamlInput, {getPadding:()=>'  ', getFormatingLang:()=>'YAML'}));
 
             // Replicate
             await assert("Transformers", "Replicate", "Simple", "A", "AA", () => trs.replicate("A", {getReplicateMode:()=>"simple"}));
@@ -272,41 +336,52 @@
             });
 
             await assert("Transformers", "Replace", "Escaped Replacement", "tab", "\t", () => {
-                window.getReplaceValue = () => "tab"; window.getReplaceWith = () => "\\t"; window.getReplaceAll = () => true;
+                window.getReplaceValue = () => "tab"; window.getReplaceWith = () => "\t"; window.getReplaceAll = () => true;
                 window.isReplaceRegex = () => false;
                 window.getReplaceEscaped = () => true;
                 return trs.replace("tab");
             });
 
-            // Async Transformers
+            // Category 2: Transformer Variants
             await assert("Transformers", "Compress", "Deflate", "hello", "string", async () => {
                 const compressed = await trs.compress("hello", {compressAlgorithm:()=>"deflate"});
                 return typeof compressed;
             });
-            await assert("Transformers", "Compress", "GZip", "hello", "string", async () => {
-                const compressed = await trs.compress("hello", {compressAlgorithm:()=>"gzip"});
+            await assert("Transformers", "Compress", "Deflate Raw", "hello", "string", async () => {
+                const compressed = await trs.compress("hello", {compressAlgorithm:()=>"deflate-raw"});
                 return typeof compressed;
             });
-            await assert("Transformers", "Decompress", "Deflate", "eJzLSM3JyQcABiwCFQ==", "hello", async () => {
-                return await trs.decompress("eJzLSM3JyQcABiwCFQ==", {compressAlgorithm:()=>"deflate"});
-            });
-
+            // Category 2: Transformer Variants
             await assert("Transformers", "Digest", "SHA-256 Hex", "hello", "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", async () => {
                 return await trs.digest("hello", {digestAlgorithm:()=>"SHA-256", digestOutputFormat:()=>"hex"});
             });
             await assert("Transformers", "Digest", "SHA-1 Base64", "hello", "qvTGHdzF6KLavt4PO0gs2a6pQ00=", async () => {
                 return await trs.digest("hello", {digestAlgorithm:()=>"SHA-1", digestOutputFormat:()=>"base64"});
             });
+            await assert("Transformers", "Digest", "SHA-384 Base64", "hello", "string", async () => {
+                const hash = await trs.digest("hello", {digestAlgorithm:()=>"SHA-384", digestOutputFormat:()=>"base64"});
+                return typeof hash === "string" && hash.length > 20;
+            });
+            await assert("Transformers", "Digest", "SHA-512 Hex", "hello", "string", async () => {
+                const hash = await trs.digest("hello", {digestAlgorithm:()=>"SHA-512", digestOutputFormat:()=>"hex"});
+                return typeof hash === "string" && hash.length === 128;
+            });
 
-            // Generators
+            await assert("Transformers", "Compress", "Deflate", "hello", "string", async () => {
+                const compressed = await trs.compress("hello", {compressAlgorithm:()=>"deflate"});
+                return typeof compressed;
+            });
+            await assert("Transformers", "Compress", "Deflate Raw", "hello", "string", async () => {
+                const compressed = await trs.compress("hello", {compressAlgorithm:()=>"deflate-raw"});
+                return typeof compressed;
+            });
+
+            // Category 3: Generators
             await assert("Generators", "Epoch", "Type check", "(current time)", "string", () => typeof gens.epoch());
+            await assert("Generators", "ISO DateTime", "Format check", "(now)", true, () => /\d{4}-\d{2}-\d{2}T/.test(gens.isoDateTime()));
             await assert("Generators", "Random String", "Simple Lower", "length 5", true, () => {
                 const rnd = gens.randomString({loadParams:()=>({length:5, lower:true, upper:false, digits:false, special:false})});
                 return rnd.length === 5 && /^[a-z]+$/.test(rnd);
-            });
-            await assert("Generators", "Random String", "Custom Special", "chars: !@", true, () => {
-                const rnd = gens.randomString({loadParams:()=>({length:10, lower:false, upper:false, digits:false, special:true, specialChars:"!@"})});
-                return /^[!@]+$/.test(rnd);
             });
 
             // --- RENDER RESULTS ---

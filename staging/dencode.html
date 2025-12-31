@@ -795,9 +795,13 @@
                 if (typeof obj === 'undefined') return '';
                 if (typeof obj !== 'object') {
                     if (typeof obj === 'string') {
-                         if (obj.includes(':') || obj.includes('#') || obj.trim().length !== obj.length || !isNaN(Number(obj)) || obj === "true" || obj === "false" || obj === "null" || obj === "[]" || obj === "{}") {
-                             return JSON.stringify(obj);
-                         }
+                        if (obj.includes('\n')) {
+                            const blockIndent = paddingChar.repeat(indentLevel + 1);
+                            return '|\n' + obj.split('\n').map(l => blockIndent + l).join('\n');
+                        }
+                        if (obj.includes(':') || obj.includes('#') || obj.trim().length !== obj.length || !isNaN(Number(obj)) || obj === "true" || obj === "false" || obj === "null" || obj === "[]" || obj === "{}") {
+                            return JSON.stringify(obj);
+                        }
                     }
                     return String(obj);
                 }
@@ -810,15 +814,10 @@
                     if (obj.length === 0) return '[]';
                     obj.forEach(item => {
                         const itemStr = auxiliary.objectToYaml(item, indentLevel + 1, paddingChar);
-                        if (itemStr.includes('\n') && (typeof item === 'object' && item !== null && !Array.isArray(item))) {
-                             const trimmedItem = itemStr.trimStart();
-                             yaml += `${indent}- ${trimmedItem}\n`;
+                        if (itemStr.startsWith('|') || itemStr.includes('\n')) {
+                             yaml += `${indent}- ${itemStr}\n`;
                         } else {
-                             if (itemStr.includes('\n')) {
-                                 yaml += `${indent}- \n${itemStr}\n`;
-                             } else {
-                                 yaml += `${indent}- ${itemStr.trim()}\n`;
-                             }
+                             yaml += `${indent}- ${itemStr.trim()}\n`;
                         }
                     });
                 } else {
@@ -827,10 +826,11 @@
                         const valStr = auxiliary.objectToYaml(value, indentLevel + 1, paddingChar);
                         
                         const isComplex = typeof value === 'object' && value !== null && !(value instanceof Date);
+                        const isMultiline = typeof value === 'string' && value.includes('\n');
                         const isEmpty = isComplex && (Array.isArray(value) ? value.length === 0 : Object.keys(value).length === 0);
                         
-                        if (isComplex && !isEmpty) {
-                            yaml += `${indent}${key}:\n${valStr}\n`;
+                        if ((isComplex && !isEmpty) || isMultiline) {
+                            yaml += `${indent}${key}: ${valStr}\n`;
                         } else {
                             yaml += `${indent}${key}: ${valStr.trim()}\n`;
                         }
@@ -853,18 +853,13 @@
                     if (v === '[]') return [];
                     if (v === '{}') return {};
                     
-                    // Try to parse flow-style arrays/objects as JSON
-                    if ((v.startsWith('[') && v.endsWith(']')) || (v.startsWith('{') && v.endsWith('}'))) {
-                        try {
-                            return JSON.parse(v);
-                        } catch (e) {
-                            // If JSON parse fails (e.g. [a, b] without quotes), fall through to string/number
-                        }
+                    if (v.startsWith('"') && v.endsWith('"')) {
+                        try { return JSON.parse(v); } catch (e) { return v.slice(1, -1); }
                     }
+                    if (v.startsWith("'") && v.endsWith("'")) return v.slice(1, -1);
 
                     const num = Number(v);
                     if (!isNaN(num) && v.trim() !== "") return num;
-                    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) return v.slice(1, -1);
                     return v;
                 };
 
@@ -874,67 +869,77 @@
 
                     while (i < linesArr.length) {
                         const line = linesArr[i];
-                        const trimmed = line.trim();
-                        if (!trimmed || trimmed.startsWith('#')) { i++; continue; }
+                        if (!line.trim() || line.trim().startsWith('#')) { i++; continue; }
 
                         const indent = line.search(/\S/);
                         if (indent < minIndent) break;
 
+                        const trimmed = line.trim();
+
                         if (trimmed.startsWith('-')) {
                             if (result === null) result = [];
-                            if (!Array.isArray(result)) { i++; continue; }
-
-                            const content = trimmed.substring(1).trim();
-                            if (!content) {
+                            let content = trimmed.substring(1).trim();
+                            
+                            if (content === '|' || content === '>') {
+                                const mode = content;
+                                let blockLines = [];
+                                i++;
+                                let blockIndent = -1;
+                                while (i < linesArr.length) {
+                                    if (!linesArr[i].trim()) { blockLines.push(""); i++; continue; }
+                                    const nextIndent = linesArr[i].search(/\S/);
+                                    if (blockIndent === -1) blockIndent = nextIndent;
+                                    if (nextIndent < blockIndent) break;
+                                    blockLines.push(linesArr[i].substring(blockIndent));
+                                    i++;
+                                }
+                                result.push(mode === '|' ? blockLines.join('\n') : blockLines.join(' ').trim());
+                            } else if (!content) {
                                 const sub = parseBlock(i + 1, indent + 1);
                                 result.push(sub.data);
                                 i = sub.nextIdx;
                             } else {
                                 const kv = content.match(/^([^:]+):\s*(.*)$/);
-                                if (kv) {
-                                    let obj = {};
-                                    const k = kv[1].trim();
-                                    const v = kv[2].trim();
-                                    obj[k] = v ? parseScalar(v) : null;
-
-                                    const keyIndent = indent + 2;
-                                    i++;
-
-                                    while (i < linesArr.length) {
-                                        const nextLine = linesArr[i];
-                                        const nextTrimmed = nextLine.trim();
-                                        if (!nextTrimmed || nextTrimmed.startsWith('#')) { i++; continue; }
-
-                                        const nextIndent = nextLine.search(/\S/);
-                                        if (nextIndent < keyIndent) break;
-                                        if (nextTrimmed.startsWith('-')) break;
-
-                                        const nextKv = nextTrimmed.match(/^([^:]+):\s*(.*)$/);
-                                        if (nextKv) {
-                                            const nk = nextKv[1].trim();
-                                            const nv = nextKv[2].trim();
-                                            obj[nk] = nv ? parseScalar(nv) : null;
-                                            i++;
-                                        } else {
-                                            break;
-                                        }
-                                    }
-                                    result.push(obj);
+                                const isCompactList = content.startsWith('-');
+                                
+                                if (kv || isCompactList) {
+                                    // Compact sequence or mapping: start a sub-block at the current position
+                                    // but we need to pass a string that doesn't have the parent's "-"
+                                    const spaces = " ".repeat(line.indexOf('-') + 1);
+                                    const virtualLine = spaces + " " + content;
+                                    const originalLine = linesArr[i];
+                                    linesArr[i] = virtualLine;
+                                    const sub = parseBlock(i, indent + 1);
+                                    linesArr[i] = originalLine; // restore
+                                    result.push(sub.data);
+                                    i = sub.nextIdx;
                                 } else {
                                     result.push(parseScalar(content));
                                     i++;
                                 }
                             }
                         } else {
-                            if (result === null) result = {};
-                            if (Array.isArray(result)) { i++; continue; }
-
                             const kv = trimmed.match(/^([^:]+):\s*(.*)$/);
                             if (kv) {
+                                if (result === null) result = {};
                                 const key = kv[1].trim();
-                                const valStr = kv[2].trim();
+                                let valStr = kv[2].trim();
 
-                                if (!valStr) {
+                                if (valStr === '|' || valStr === '>') {
+                                    const mode = valStr;
+                                    let blockLines = [];
+                                    i++;
+                                    let blockIndent = -1;
+                                    while (i < linesArr.length) {
+                                        if (!linesArr[i].trim()) { blockLines.push(""); i++; continue; }
+                                        const nextIndent = linesArr[i].search(/\S/);
+                                        if (blockIndent === -1) blockIndent = nextIndent;
+                                        if (nextIndent < blockIndent) break;
+                                        blockLines.push(linesArr[i].substring(blockIndent));
+                                        i++;
+                                    }
+                                    result[key] = mode === '|' ? blockLines.join('\n') : blockLines.join(' ').trim();
+                                } else if (!valStr) {
                                     const sub = parseBlock(i + 1, indent + 1);
                                     result[key] = sub.data;
                                     i = sub.nextIdx;

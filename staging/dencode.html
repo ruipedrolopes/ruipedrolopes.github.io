@@ -254,6 +254,14 @@
             color: #000000;
         }
 
+        .button:disabled, .buttonGroup > input[type=button]:disabled, .buttonGroup > select:disabled {
+            background-color: #555;
+            color: #888;
+            border-color: #444;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
         .button-large {
             padding: 6px 22px;
             font-size: 16px;
@@ -388,6 +396,7 @@
                 if (k === "class") e.className = v;
                 else if (k === "on") Object.entries(v).forEach(([ev, fn]) => e.addEventListener(ev, fn));
                 else if (k === "style" && typeof v === "object") Object.assign(e.style, v);
+                else if (k === "dataset" && typeof v === "object") Object.assign(e.dataset, v);
                 else e[k] = v;
             });
             const append = (p, c) => {
@@ -793,48 +802,47 @@
                 
                 if (obj === null) return 'null';
                 if (typeof obj === 'undefined') return '';
-                if (typeof obj !== 'object') {
+                
+                if (typeof obj !== 'object' || obj instanceof Date) {
+                    let val = obj instanceof Date ? obj.toISOString() : String(obj);
                     if (typeof obj === 'string') {
-                        if (obj.includes('\n')) {
+                        if (val.includes('\n')) {
                             const blockIndent = paddingChar.repeat(indentLevel + 1);
-                            return '|\n' + obj.split('\n').map(l => blockIndent + l).join('\n');
+                            return '|\n' + val.split('\n').map(l => blockIndent + l).join('\n');
                         }
-                        if (obj.includes(':') || obj.includes('#') || obj.trim().length !== obj.length || !isNaN(Number(obj)) || obj === "true" || obj === "false" || obj === "null" || obj === "[]" || obj === "{}") {
-                            return JSON.stringify(obj);
+                        if (val.includes(':') || val.includes('#') || val.trim().length !== val.length || !isNaN(Number(val)) || val === "true" || val === "false" || val === "null" || val === "[]" || val === "{}") {
+                            return JSON.stringify(val);
                         }
                     }
-                    return String(obj);
+                    return val;
                 }
-                
-                if (obj instanceof Date) return obj.toISOString();
 
                 let yaml = '';
-                
                 if (Array.isArray(obj)) {
                     if (obj.length === 0) return '[]';
                     obj.forEach(item => {
+                        const isComplex = typeof item === 'object' && item !== null && !(item instanceof Date) && (Array.isArray(item) ? item.length > 0 : Object.keys(item).length > 0);
                         const itemStr = auxiliary.objectToYaml(item, indentLevel + 1, paddingChar);
-                        if (itemStr.startsWith('|') || itemStr.includes('\n')) {
-                             yaml += `${indent}- ${itemStr}\n`;
-                        } else {
-                             yaml += `${indent}- ${itemStr.trim()}\n`;
-                        }
+                        // For complex items (objects/arrays), we append the first line to "- " and keep the rest indented.
+                        // objectToYaml returns already indented strings, so we trim the first line's indentation.
+                        yaml += `${indent}- ${itemStr.trimStart()}\n`;
                     });
                 } else {
-                    if (Object.keys(obj).length === 0) return '{}';
-                    for (const [key, value] of Object.entries(obj)) {
+                    const keys = Object.keys(obj);
+                    if (keys.length === 0) return '{}';
+                    keys.forEach(key => {
+                        const value = obj[key];
+                        const isComplex = typeof value === 'object' && value !== null && !(value instanceof Date) && (Array.isArray(value) ? value.length > 0 : Object.keys(value).length > 0);
                         const valStr = auxiliary.objectToYaml(value, indentLevel + 1, paddingChar);
                         
-                        const isComplex = typeof value === 'object' && value !== null && !(value instanceof Date);
-                        const isMultiline = typeof value === 'string' && value.includes('\n');
-                        const isEmpty = isComplex && (Array.isArray(value) ? value.length === 0 : Object.keys(value).length === 0);
-                        
-                        if ((isComplex && !isEmpty) || isMultiline) {
-                            yaml += `${indent}${key}: ${valStr}\n`;
+                        if (isComplex) {
+                            // Start complex values on a new line
+                            yaml += `${indent}${key}:\n${valStr}\n`;
                         } else {
-                            yaml += `${indent}${key}: ${valStr.trim()}\n`;
+                            // Simple values on the same line
+                            yaml += `${indent}${key}: ${valStr.trimStart()}\n`;
                         }
-                    }
+                    });
                 }
                 return yaml.trimEnd();
             },
@@ -957,6 +965,132 @@
 
                 const parsedResult = parseBlock(0, 0);
                 return parsedResult.data || {};
+            },
+
+            findJsonRange: function (json, path) {
+                if (!path || !path.startsWith('$')) return null;
+
+                const segments = [];
+                const regex = /\[(?:(\d+)|"((?:[^"\\]|\\.)*)")\]/g;
+                let match;
+                while ((match = regex.exec(path)) !== null) {
+                    segments.push(match[1] !== undefined ? parseInt(match[1]) : match[2].replace(/\\(.)/g, '$1'));
+                }
+
+                let pos = 0;
+                const skipWS = () => { while (pos < json.length && /\s/.test(json[pos])) pos++; };
+
+                const skipString = () => {
+                    if (json[pos] !== '"') return;
+                    pos++;
+                    while (pos < json.length) {
+                        if (json[pos] === '\\') pos += 2;
+                        else if (json[pos] === '"') { pos++; return; }
+                        else pos++;
+                    }
+                };
+
+                const skipValue = () => {
+                    skipWS();
+                    if (pos >= json.length) return;
+                    const char = json[pos];
+                    const startPos = pos;
+
+                    if (char === '"') {
+                        skipString();
+                    } else if (char === '{' || char === '[') {
+                        const endChar = char === '{' ? '}' : ']';
+                        pos++;
+                        while (pos < json.length) {
+                            skipWS();
+                            if (json[pos] === endChar) { pos++; return; }
+                            const beforeValue = pos;
+                            skipValue();
+                            if (pos === beforeValue) { pos++; continue; } // Safety advance
+                            skipWS();
+                            if (json[pos] === ':') { // Handle object colon
+                                pos++;
+                                skipValue();
+                            }
+                            skipWS();
+                            if (json[pos] === ',') pos++;
+                        }
+                    } else {
+                        while (pos < json.length && !/[,\}\]:\s]/.test(json[pos])) pos++;
+                    }
+                    if (pos === startPos && pos < json.length) pos++; // Ensure advancement
+                };
+
+                const getValueRange = (start) => {
+                    const oldPos = pos;
+                    pos = start;
+                    skipValue();
+                    const res = { start, end: pos };
+                    pos = oldPos;
+                    return res;
+                };
+
+                skipWS();
+                let start = pos, end = json.length;
+                let tempEnd = json.length;
+                while (tempEnd > start && /\s/.test(json[tempEnd - 1])) tempEnd--;
+                end = tempEnd;
+
+                for (const seg of segments) {
+                    skipWS();
+                    const containerType = json[pos];
+                    let found = false;
+                    if (typeof seg === 'string') {
+                        if (containerType !== '{') return null;
+                        pos++;
+                        while (pos < json.length) {
+                            skipWS();
+                            if (json[pos] === '}') break;
+                            const keyStart = pos;
+                            if (json[pos] !== '"') { pos++; continue; } // Skip malformed keys
+                            skipString();
+                            const keyEnd = pos;
+                            let key;
+                            try { key = JSON.parse(json.slice(keyStart, keyEnd)); } catch (e) { pos++; continue; }
+                            skipWS();
+                            if (json[pos] === ':') pos++;
+                            skipWS();
+                            const valRange = getValueRange(pos);
+                            if (key === seg) {
+                                start = valRange.start;
+                                end = valRange.end;
+                                pos = start;
+                                found = true;
+                                break;
+                            } else {
+                                pos = valRange.end;
+                                skipWS();
+                                if (json[pos] === ',') pos++;
+                            }
+                        }
+                    } else {
+                        if (containerType !== '[') return null;
+                        pos++;
+                        for (let i = 0; i <= seg; i++) {
+                            skipWS();
+                            if (json[pos] === ']') break;
+                            const valRange = getValueRange(pos);
+                            if (i === seg) {
+                                start = valRange.start;
+                                end = valRange.end;
+                                pos = start;
+                                found = true;
+                                break;
+                            } else {
+                                pos = valRange.end;
+                                skipWS();
+                                if (json[pos] === ',') pos++;
+                            }
+                        }
+                    }
+                    if (!found) return null;
+                }
+                return { start, end };
             }
         };
 
@@ -1989,21 +2123,43 @@
          * @param {string} containerElementId The ID of the container element to render the tree into.
          * @param {string} type The type of the object (e.g., "JSON").
          */
-        function createObjectTreeView(data, containerElementId, type = "JSON") {
+        function createObjectTreeView(data, containerElementId, detectedType = "JSON") {
             const container = document.getElementById(containerElementId);
             if (!container) return;
             container.innerHTML = '';
             container.classList.add('object-tree-container');
 
-            const copyToCb = (text, button) => {
+            const copyToCb = (text, target) => {
                 navigator.clipboard.writeText(text).then(() => {
-                    const old = button.textContent;
-                    button.textContent = 'Copied!';
-                    setTimeout(() => button.textContent = old, 1500);
+                    const el = target.tagName === 'SELECT' ? target.options[0] : target;
+                    const old = el.textContent;
+                    el.textContent = 'Copied!';
+                    setTimeout(() => el.textContent = old, 1500);
                 });
             };
 
-            const buildNode = (key, value, isRoot = false) => {
+            const btn = (text, title, onclick, props = {}) => el('button', { 
+                class: 'button button-xsmall node-action-btn', 
+                textContent: text, 
+                title, 
+                on: { click: (e) => { e.stopPropagation(); onclick(e); } },
+                ...props
+            });
+
+            const group = (name, actions) => {
+                const s = el('select', { class: 'button button-xsmall node-action-btn', on: {
+                    change: (e) => { 
+                        const fn = actions[e.target.value]; 
+                        if (fn) fn(e); 
+                        e.target.selectedIndex = 0; 
+                    },
+                    click: (e) => e.stopPropagation()
+                }}, el('option', { textContent: name, disabled: true, selected: true, hidden: true }));
+                Object.keys(actions).forEach(k => s.appendChild(el('option', { value: k, textContent: k })));
+                return s;
+            };
+
+            const buildNode = (key, value, path, isRoot = false) => {
                 const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
                 const styleType = type === 'boolean' ? (value ? 'boolean-true' : 'boolean-false') : type;
                 const isComplex = type === 'object' || type === 'array';
@@ -2011,12 +2167,11 @@
                 const isExpandable = isComplex && !isEmpty;
 
                 const toggle = el('span', { class: 'toggle' + (isExpandable ? '' : ' hidden-visibility'), textContent: isExpandable ? '▶' : '▼' });
-                const btn = (text, title, onclick) => el('button', { class: 'button button-xsmall node-action-btn', textContent: text, title, on: { click: (e) => { e.stopPropagation(); onclick(e); } } });
 
                 const childrenContainer = el('div', { class: 'children hidden-display' });
                 let childrenBuilt = false;
 
-                const row = el('div', { class: isExpandable ? 'header' : 'primitive-node', on: { click: () => {
+                const row = el('div', { class: isExpandable ? 'header' : 'primitive-node', dataset: { path }, on: { click: () => {
                     if (!isExpandable) return;
                     const isExpanded = toggle.classList.toggle('expanded');
                     toggle.textContent = isExpanded ? '▼' : '▶';
@@ -2026,7 +2181,11 @@
                         const CHUNK = 100;
                         let cur = 0;
                         const render = () => {
-                            entries.slice(cur, cur + CHUNK).forEach(([k, v]) => childrenContainer.appendChild(buildNode(k, v)));
+                            const isArr = Array.isArray(value);
+                            entries.slice(cur, cur + CHUNK).forEach(([k, v]) => {
+                                const childPath = isArr ? `${path}[${k}]` : `${path}[${JSON.stringify(k)}]`;
+                                childrenContainer.appendChild(buildNode(k, v, childPath));
+                            });
                             cur += CHUNK;
                             if (cur < entries.length) {
                                 childrenContainer.appendChild(el('div', { class: 'node header load-more', textContent: `... Show more (${entries.length - cur} left)`, on: { click: (e) => { e.stopPropagation(); childrenContainer.lastChild.remove(); render(); } } }));
@@ -2034,8 +2193,7 @@
                         };
                         render();
                         childrenBuilt = true;
-                    }
-                }}}, 
+                    }}}}, 
                     toggle,
                     el('span', { class: `type-icon ${styleType}`, textContent: {object:'{}', array:'[]', string:'“”', number:'#', boolean:value?'✓':'✗', null:'∅'}[type] || '' }),
                     el('span', { class: `key ${styleType}`, textContent: `${key}: ` }),
@@ -2053,26 +2211,56 @@
                         return el('span', { class: `value ${styleType}` }, txt, ell, more);
                     })(),
                     el('div', { class: 'node-buttons' },
-                        isComplex ? [
-                            btn('Copy JSON', '', (e) => copyToCb(JSON.stringify(value, null, formatWhitepacePadding()), e.target)),
-                            btn('Copy YAML', '', (e) => copyToCb(auxiliary.objectToYaml(value, 0, formatWhitepacePadding()), e.target)),
-                            btn('Apply JSON', 'Replace main text', () => applyValueToMain(JSON.stringify(value, null, formatWhitepacePadding()))),
-                            btn('Apply YAML', 'Replace main text', () => applyValueToMain(auxiliary.objectToYaml(value, 0, formatWhitepacePadding())))
-                        ] : [
-                            btn('Copy Value', '', (e) => copyToCb(typeof value === 'string' ? value : JSON.stringify(value), e.target)),
-                            btn('Apply Value', 'Replace main text', () => applyValueToMain(typeof value === 'string' ? value : JSON.stringify(value)))
-                        ]
+                        btn('Select', 'Select in main text', () => {
+                            const range = auxiliary.findJsonRange(getValueElement().value, path);
+                            if (range) {
+                                const valEl = getValueElement();
+                                valEl.focus();
+                                valEl.setSelectionRange(range.start, range.end);
+                                
+                                // Scroll into view
+                                const textBefore = valEl.value.substring(0, range.start);
+                                const lineNum = textBefore.split('\n').length;
+                                const style = getComputedStyle(valEl);
+                                const lineHeight = parseFloat(style.lineHeight) || (parseFloat(style.fontSize) * 1.2);
+                                
+                                const targetScroll = (lineNum - 1) * lineHeight;
+                                // Center the selected line in the textarea
+                                valEl.scrollTop = targetScroll - (valEl.clientHeight / 2) + (lineHeight / 2);
+                                
+                                fetchData();
+                            } else {
+                                warn("Could not find path in source.");
+                            }
+                        },
+                        { disabled: detectedType !== 'JSON' }),
+                            ...(isComplex ? [
+                                group('JSON', {
+                                    'Copy': (e) => copyToCb(JSON.stringify(value, null, formatWhitepacePadding()), e.target),
+                                    'Apply': () => applyValueToMain(JSON.stringify(value, null, formatWhitepacePadding())),
+                                    'Copy Path': (e) => copyToCb(path, e.target)
+                                }),
+                                group('YAML', {
+                                    'Copy': (e) => copyToCb(auxiliary.objectToYaml(value, 0, formatWhitepacePadding()), e.target),
+                                    'Apply': () => applyValueToMain(auxiliary.objectToYaml(value, 0, formatWhitepacePadding()))
+                                })
+                            ] : [
+                                btn('Copy Value', '', (e) => copyToCb(typeof value === 'string' ? value : JSON.stringify(value), e.target)),
+                                btn('Apply Value', 'Replace main text', () => applyValueToMain(typeof value === 'string' ? value : JSON.stringify(value))),
+                                btn('Copy Path', 'Copy JSON Path', (e) => copyToCb(path, e.target))
+                            ])
                     )
                 );
 
                 return el('div', { class: 'node' + (isRoot ? ' root' : '') }, row, childrenContainer);
             };
 
-            container.appendChild(el('div', { class: 'object-tree-title' },
-                el('span', { textContent: 'Tree Viewer' }),
-                el('span', { class: 'type-tag', textContent: type }),
-                el('div', { class: 'tree-actions' },
-                    el('button', { class: 'tree-action-btn', textContent: 'Expand All', on: { click: () => {
+            container.appendChild(
+                el('div', { class: 'object-tree-title' },
+                    el('span', { textContent: 'Tree Viewer' }),
+                    el('span', { class: 'type-tag', textContent: detectedType }),
+                    el('div', { class: 'tree-actions' },
+                        el('button', { class: 'tree-action-btn', textContent: 'Expand All', on: { click: () => {
                         const exp = (p) => {
                             p.querySelectorAll('.header').forEach(h => {
                                 if (!h.querySelector('.toggle').classList.contains('expanded')) h.click();
@@ -2083,13 +2271,13 @@
                         exp(container);
                     }}}),
                     el('button', { class: 'tree-action-btn', textContent: 'Collapse All', on: { click: () => {
-                        Array.from(container.querySelectorAll('.header')).reverse().forEach(h => {
-                            if (h.querySelector('.toggle').classList.contains('expanded')) h.click();
-                        });
-                    }}})
-                )
-            ));
-            container.appendChild(buildNode('root', data, true));
+                            Array.from(container.querySelectorAll('.header')).reverse().forEach(h => {
+                                if (h.querySelector('.toggle').classList.contains('expanded')) h.click();
+                            });
+                        }}})
+                    ))
+            );
+            container.appendChild(buildNode('root', data, '$', true));
         }
 
     </script>

@@ -386,7 +386,7 @@
             const rightText = getValue2Element().value;
 
             // Generate the diff
-            const differences = Diff.createTwoFilesPatch('Left', 'Rigth', leftText, rightText);
+            const differences = Diff.createTwoFilesPatch('Left', 'Right', leftText, rightText);
 
             const configuration = {
                 outputFormat: getOutputFormat(),

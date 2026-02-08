@@ -387,7 +387,397 @@
             border-radius: 0.2rem;
         }
 
+        .loader {
+            width: 50px;
+            height: 28px;
+            --_g: no-repeat radial-gradient(farthest-side,#ffffff 94%,#ffffff00);
+            background:
+                var(--_g) 50%  0,
+                var(--_g) 100% 0;
+            background-size: 12px 12px;
+            position: relative;
+            animation: l23-0 1.5s linear infinite;
+        }
+        .loader:before {
+            content: "";
+            position: absolute;
+            height: 12px;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            background: #ffffff;
+            left:0;
+            top:0;
+            animation: 
+                l23-1 1.5s linear infinite,
+                l23-2 0.5s cubic-bezier(0,200,.8,200) infinite;
+        }
+        @keyframes l23-0 {
+            0%,31%  {background-position: 50% 0   ,100% 0}
+            33%     {background-position: 50% 100%,100% 0}
+            43%,64% {background-position: 50% 0   ,100% 0}
+            66%     {background-position: 50% 0   ,100% 100%}
+            79%     {background-position: 50% 0   ,100% 0}
+            100%    {transform:translateX(calc(-100%/3))}
+        }
+        @keyframes l23-1 {
+            100% {left:calc(100% + 7px)}
+        }
+        @keyframes l23-2 {
+            100% {top:-0.1px}
+        }
+
     </style>
+
+    <script type="text/javascript" id="shared">
+
+        const shared = {
+            objectToYaml: function(obj, indentLevel, paddingChar) {
+                indentLevel = indentLevel || 0;
+                paddingChar = paddingChar || '  ';
+                const indent = paddingChar.repeat(indentLevel);
+                
+                if (obj === null) return 'null';
+                if (typeof obj === 'undefined') return '';
+                
+                if (typeof obj !== 'object' || obj instanceof Date) {
+                    let val = obj instanceof Date ? obj.toISOString() : String(obj);
+                    if (typeof obj === 'string') {
+                        if (val.includes('\n')) {
+                            const blockIndent = paddingChar.repeat(indentLevel + 1);
+                            return '|\n' + val.split('\n').map(l => blockIndent + l).join('\n');
+                        }
+                        if (val.includes(':') || val.includes('#') || val.trim().length !== val.length || !isNaN(Number(val)) || val === "true" || val === "false" || val === "null" || val === "[]" || val === "{}") {
+                            return JSON.stringify(val);
+                        }
+                    }
+                    return val;
+                }
+
+                let yaml = '';
+                if (Array.isArray(obj)) {
+                    if (obj.length === 0) return '[]';
+                    obj.forEach(item => {
+                        const isComplex = typeof item === 'object' && item !== null && !(item instanceof Date) && (Array.isArray(item) ? item.length > 0 : Object.keys(item).length > 0);
+                        const itemStr = shared.objectToYaml(item, indentLevel + 1, paddingChar);
+                        // For complex items (objects/arrays), we append the first line to "- " and keep the rest indented.
+                        // objectToYaml returns already indented strings, so we trim the first line's indentation.
+                        yaml += `${indent}- ${itemStr.trimStart()}\n`;
+                    });
+                } else {
+                    const keys = Object.keys(obj);
+                    if (keys.length === 0) return '{}';
+                    keys.forEach(key => {
+                        const value = obj[key];
+                        const isComplex = typeof value === 'object' && value !== null && !(value instanceof Date) && (Array.isArray(value) ? value.length > 0 : Object.keys(value).length > 0);
+                        const valStr = shared.objectToYaml(value, indentLevel + 1, paddingChar);
+                        
+                        if (isComplex) {
+                            // Start complex values on a new line
+                            yaml += `${indent}${key}:\n${valStr}\n`;
+                        } else {
+                            // Simple values on the same line
+                            yaml += `${indent}${key}: ${valStr.trimStart()}\n`;
+                        }
+                    });
+                }
+                return yaml.trimEnd();
+            },
+
+            yamlToObject: function(str) {
+                if (!str || !str.trim()) throw new Error("Empty string");
+
+                const linesArr = str.split(/\r?\n/);
+
+                const parseScalar = (v) => {
+                    v = v.trim();
+                    if (v === 'true') return true;
+                    if (v === 'false') return false;
+                    if (v === 'null') return null;
+                    if (v === '') return null;
+                    if (v === '[]') return [];
+                    if (v === '{}') return {};
+                    
+                    if (v.startsWith('"') && v.endsWith('"')) {
+                        try { return JSON.parse(v); } catch (e) { return v.slice(1, -1); }
+                    }
+                    if (v.startsWith("'") && v.endsWith("'")) return v.slice(1, -1);
+
+                    const num = Number(v);
+                    if (!isNaN(num) && v.trim() !== "") return num;
+                    return v;
+                };
+
+                function parseBlock(startIdx, minIndent) {
+                    let result = null;
+                    let i = startIdx;
+
+                    while (i < linesArr.length) {
+                        const line = linesArr[i];
+                        if (!line.trim() || line.trim().startsWith('#')) { i++; continue; }
+
+                        const indent = line.search(/\S/);
+                        if (indent < minIndent) break;
+
+                        const trimmed = line.trim();
+
+                        if (trimmed.startsWith('-')) {
+                            if (result === null) result = [];
+                            if (!Array.isArray(result)) throw new Error("YAML Error: sequence entry encountered in a mapping at index " + i);
+                            let content = trimmed.substring(1).trim();
+                            
+                            if (content === '|' || content === '>') {
+                                const mode = content;
+                                let blockLines = [];
+                                i++;
+                                let blockIndent = -1;
+                                while (i < linesArr.length) {
+                                    if (!linesArr[i].trim()) { blockLines.push(""); i++; continue; }
+                                    const nextIndent = linesArr[i].search(/\S/);
+                                    if (blockIndent === -1) blockIndent = nextIndent;
+                                    if (nextIndent < blockIndent) break;
+                                    blockLines.push(linesArr[i].substring(blockIndent));
+                                    i++;
+                                }
+                                result.push(mode === '|' ? blockLines.join('\n') : blockLines.join(' ').trim());
+                            } else if (!content) {
+                                const sub = parseBlock(i + 1, indent + 1);
+                                result.push(sub.data);
+                                i = sub.nextIdx;
+                            } else {
+                                const kv = content.match(/^([^:]+):\s*(.*)$/);
+                                const isCompactList = content.startsWith('-');
+                                
+                                if (kv || isCompactList) {
+                                    // Compact sequence or mapping: start a sub-block at the current position
+                                    // but we need to pass a string that doesn't have the parent's "-"
+                                    const spaces = " ".repeat(line.indexOf('-') + 1);
+                                    const virtualLine = spaces + " " + content;
+                                    const originalLine = linesArr[i];
+                                    linesArr[i] = virtualLine;
+                                    const sub = parseBlock(i, indent + 1);
+                                    linesArr[i] = originalLine; // restore
+                                    result.push(sub.data);
+                                    i = sub.nextIdx;
+                                } else {
+                                    result.push(parseScalar(content));
+                                    i++;
+                                }
+                            }
+                        } else {
+                            const kv = trimmed.match(/^([^:]+):\s*(.*)$/);
+                            if (kv) {
+                                if (result === null) result = {};
+                                if (Array.isArray(result)) throw new Error("YAML Error: mapping entry encountered in a sequence at index " + i);
+                                const key = kv[1].trim();
+                                let valStr = kv[2].trim();
+
+                                if (valStr === '|' || valStr === '>') {
+                                    const mode = valStr;
+                                    let blockLines = [];
+                                    i++;
+                                    let blockIndent = -1;
+                                    while (i < linesArr.length) {
+                                        if (!linesArr[i].trim()) { blockLines.push(""); i++; continue; }
+                                        const nextIndent = linesArr[i].search(/\S/);
+                                        if (blockIndent === -1) blockIndent = nextIndent;
+                                        if (nextIndent < blockIndent) break;
+                                        blockLines.push(linesArr[i].substring(blockIndent));
+                                        i++;
+                                    }
+                                    result[key] = mode === '|' ? blockLines.join('\n') : blockLines.join(' ').trim();
+                                } else if (!valStr) {
+                                    const sub = parseBlock(i + 1, indent + 1);
+                                    result[key] = sub.data;
+                                    i = sub.nextIdx;
+                                } else {
+                                    result[key] = parseScalar(valStr);
+                                    i++;
+                                }
+                            } else {
+                                i++;
+                            }
+                        }
+                    }
+                    return { data: result, nextIdx: i };
+                }
+
+                const parsedResult = parseBlock(0, 0);
+                return parsedResult.data || {};
+            }
+
+        };
+
+    </script>
+
+    <script type="text/javascript" id="detectFormatWorker">
+
+        const formatDetect = {
+
+            isValidString: (str) => typeof str === 'string' && str.length > 0,
+
+
+            // detects if a string is valid JSON, malformed JSON, or not JSON at all.
+            // Returns:
+            //   - true: if the string is valid JSON.
+            //   - false: if the string is not trying to be JSON.
+            //   - object: with error details if the string is a malformed JSON.
+            isJson: function (str) {
+                if (!this.isValidString(str)) {
+                    return false;
+                }
+                // Peek first and last non-whitespace characters
+                const startMatch = str.match(/^\s*([{\["\d-]|true|false|null)/);
+                if (!startMatch) {
+                    return false;
+                }
+
+                try {
+                    const data = JSON.parse(str);
+                    return { valid: true, data: data };
+                } catch (e) {
+                    // Heuristic to determine if it's a malformed attempt vs. not JSON at all.
+                    const firstChar = startMatch[1][0];
+                    if (['{', '[', '"'].includes(firstChar) || /^(-|true|false|null)/i.test(startMatch[1]) || (firstChar >= '0' && firstChar <= '9')) {
+                        return { name: e.name, message: e.message, exception: e };
+                    }
+                    return false;
+                }
+            },
+
+            // detects if a string is valid XML, malformed XML, or not XML at all.
+            // Returns:
+            //   - true: if the string is well-formed XML.
+            //   - false: if the string is not trying to be XML.
+            //   - object: with error details if the string is a malformed XML.
+            isXml: function (str) {
+                return false; // TEMP: DOMParser is not available in worker.
+
+                if (!this.isValidString(str)) {
+                    return false;
+                }
+                const xmlLikeRegex = /^\s*<(\?|!|(\w)|(\/))/;
+                if (!xmlLikeRegex.test(str)) {
+                    return false;
+                }
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(str, "application/xml");
+                const parserError = xmlDoc.querySelector("parsererror");
+                if (parserError) {
+                    return {
+                        name: "XMLParserError",
+                        message: parserError.textContent || "Malformed XML",
+                        details: parserError
+                    };
+                }
+                return true;
+            },
+
+            // detects if a string is Base64 encoded, supporting multi-line input.
+            isBase64: function(str) {
+                if (!this.isValidString(str)) {
+                    return false;
+                }
+                // Quick check: does it contain non-base64 characters?
+                // This is much faster than replace on large strings.
+                if (/[^A-Za-z0-9+/=\s]/.test(str)) {
+                    return false;
+                }
+                const cleanStr = str.replace(/\s/g, '');
+                if (cleanStr.length === 0 || cleanStr.length % 4 !== 0) {
+                    return false;
+                }
+                const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+                return base64Regex.test(cleanStr);
+            },
+
+            // detects if a string is Hex encoded, supporting multi-line input.
+            isHex: function(str) {
+                if (!this.isValidString(str)) {
+                    return false;
+                }
+                // Quick check: does it contain non-hex characters?
+                if (/[^0-9a-fA-F\s]/.test(str)) {
+                    return false;
+                }
+                const cleanStr = str.replace(/\s/g, '');
+                if (cleanStr.length === 0 || cleanStr.length % 2 !== 0) {
+                    return false;
+                }
+                const hexRegex = /^[0-9a-fA-F]+$/;
+                return hexRegex.test(cleanStr);
+            },
+            
+            isYaml: function (str) {
+                if (!this.isValidString(str)) {
+                    return false;
+                }
+                // YAML is very broad; we only check a portion to avoid regex hanging on massive strings
+                const sample = str.substring(0, 10000);
+                const yamlIndicators = [
+                    /:\s*$/m,               // key:
+                    /^\s*-\s+/m,            // - item
+                    /^\s*\w+\s*:\s*.+$/m,   // key: value
+                    /^\s*#/,                // comment
+                    /^\s*---\s*$/m          // document start
+                ];
+                for (const regex of yamlIndicators) {
+                    if (regex.test(sample)) {
+                        return true;
+                    }
+                }
+                return false;
+            },
+        };
+
+        self.onmessage = function(event) {
+
+            const value = event.data;
+            let result = null;
+            
+            // Check for JSON (three-state return)
+            const jsonCheckResult = formatDetect.isJson(value);
+            if (jsonCheckResult.valid === true) {
+                result = { type: "JSON", valid: true, data: jsonCheckResult.data };
+            } else if (typeof jsonCheckResult === 'object') {
+                console.error("Malformed JSON detected: " + jsonCheckResult.message);
+                result = { type: "JSON", valid: false, error: jsonCheckResult };
+            }
+
+            // Check for XML (three-state return)
+            const xmlCheckResult = formatDetect.isXml(value);
+            if (xmlCheckResult === true) {
+                result = { type: "XML", valid: true };
+            } else if (typeof xmlCheckResult === 'object') {
+                console.error("Malformed XML detected: " + xmlCheckResult.message);
+                result = { type: "XML", valid: false, error: xmlCheckResult };
+            }
+
+            // Check for YAML (three-state return)
+            if (formatDetect.isYaml(value) === true) {
+                try {
+                    const data = shared.yamlToObject(value);
+                    result = { type: "YAML", valid: true, data: data };
+                } catch (e) {
+                    console.error("Malformed YAML detected: " + e.message);
+                    result = { type: "YAML", valid: false, error: e };
+                }
+            }
+            
+            // Check for Base64 (boolean return)
+            if (formatDetect.isBase64(value) === true) {
+                result = { type: "Base64", valid: true };
+            }
+            
+            // Check for Hex (boolean return)
+            if (formatDetect.isHex(value) === true) {
+                result = { type: "Hex", valid: true };
+            }
+
+            self.postMessage(result);
+        }
+
+    </script>
+
     <script type="text/javascript">
 
         const el = (tag, props = {}, ...children) => {
@@ -440,7 +830,6 @@
                         if (new Date().getTime() - window.valueTouched.getTime() >= 1000) {
                             lastValue = currentValue;
                             const detected = detectFormatOrLanguage();
-                            updateDetectedFormatDisplay(detected);
                         }
                     }
                 } catch (e) {
@@ -655,8 +1044,7 @@
         }
 
         const auxiliary = {
-            isValidString: (str) => typeof str === 'string' && str.length > 0,
-
+            
             uuidv4: function () {
                 try {
                     return crypto.randomUUID();
@@ -683,288 +1071,6 @@
                 }
                 const decoder = new TextDecoder();
                 return decoder.decode(uint8Array);
-            },
-
-            // detects if a string is valid JSON, malformed JSON, or not JSON at all.
-            // Returns:
-            //   - true: if the string is valid JSON.
-            //   - false: if the string is not trying to be JSON.
-            //   - object: with error details if the string is a malformed JSON.
-            isJson: function (str) {
-                if (!this.isValidString(str)) {
-                    return false;
-                }
-                // Peek first and last non-whitespace characters
-                const startMatch = str.match(/^\s*([{\["\d-]|true|false|null)/);
-                if (!startMatch) {
-                    return false;
-                }
-
-                try {
-                    const data = JSON.parse(str);
-                    return { valid: true, data: data };
-                } catch (e) {
-                    // Heuristic to determine if it's a malformed attempt vs. not JSON at all.
-                    const firstChar = startMatch[1][0];
-                    if (['{', '[', '"'].includes(firstChar) || /^(-|true|false|null)/i.test(startMatch[1]) || (firstChar >= '0' && firstChar <= '9')) {
-                        return { name: e.name, message: e.message, exception: e };
-                    }
-                    return false;
-                }
-            },
-
-            // detects if a string is valid XML, malformed XML, or not XML at all.
-            // Returns:
-            //   - true: if the string is well-formed XML.
-            //   - false: if the string is not trying to be XML.
-            //   - object: with error details if the string is a malformed XML.
-            isXml: function (str) {
-                if (!this.isValidString(str)) {
-                    return false;
-                }
-                const xmlLikeRegex = /^\s*<(\?|!|(\w)|(\/))/;
-                if (!xmlLikeRegex.test(str)) {
-                    return false;
-                }
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(str, "application/xml");
-                const parserError = xmlDoc.querySelector("parsererror");
-                if (parserError) {
-                    return {
-                        name: "XMLParserError",
-                        message: parserError.textContent || "Malformed XML",
-                        details: parserError
-                    };
-                }
-                return true;
-            },
-
-            // detects if a string is Base64 encoded, supporting multi-line input.
-            isBase64: function(str) {
-                if (!this.isValidString(str)) {
-                    return false;
-                }
-                // Quick check: does it contain non-base64 characters?
-                // This is much faster than replace on large strings.
-                if (/[^A-Za-z0-9+/=\s]/.test(str)) {
-                    return false;
-                }
-                const cleanStr = str.replace(/\s/g, '');
-                if (cleanStr.length === 0 || cleanStr.length % 4 !== 0) {
-                    return false;
-                }
-                const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-                return base64Regex.test(cleanStr);
-            },
-
-            // detects if a string is Hex encoded, supporting multi-line input.
-            isHex: function(str) {
-                if (!this.isValidString(str)) {
-                    return false;
-                }
-                // Quick check: does it contain non-hex characters?
-                if (/[^0-9a-fA-F\s]/.test(str)) {
-                    return false;
-                }
-                const cleanStr = str.replace(/\s/g, '');
-                if (cleanStr.length === 0 || cleanStr.length % 2 !== 0) {
-                    return false;
-                }
-                const hexRegex = /^[0-9a-fA-F]+$/;
-                return hexRegex.test(cleanStr);
-            },
-            
-            isYaml: function (str) {
-                if (!this.isValidString(str)) {
-                    return false;
-                }
-                // YAML is very broad; we only check a portion to avoid regex hanging on massive strings
-                const sample = str.substring(0, 10000);
-                const yamlIndicators = [
-                    /:\s*$/m,               // key:
-                    /^\s*-\s+/m,            // - item
-                    /^\s*\w+\s*:\s*.+$/m,   // key: value
-                    /^\s*#/,                // comment
-                    /^\s*---\s*$/m          // document start
-                ];
-                for (const regex of yamlIndicators) {
-                    if (regex.test(sample)) {
-                        return true;
-                    }
-                }
-                return false;
-            },
-
-            objectToYaml: function(obj, indentLevel, paddingChar) {
-                indentLevel = indentLevel || 0;
-                paddingChar = paddingChar || '  ';
-                const indent = paddingChar.repeat(indentLevel);
-                
-                if (obj === null) return 'null';
-                if (typeof obj === 'undefined') return '';
-                
-                if (typeof obj !== 'object' || obj instanceof Date) {
-                    let val = obj instanceof Date ? obj.toISOString() : String(obj);
-                    if (typeof obj === 'string') {
-                        if (val.includes('\n')) {
-                            const blockIndent = paddingChar.repeat(indentLevel + 1);
-                            return '|\n' + val.split('\n').map(l => blockIndent + l).join('\n');
-                        }
-                        if (val.includes(':') || val.includes('#') || val.trim().length !== val.length || !isNaN(Number(val)) || val === "true" || val === "false" || val === "null" || val === "[]" || val === "{}") {
-                            return JSON.stringify(val);
-                        }
-                    }
-                    return val;
-                }
-
-                let yaml = '';
-                if (Array.isArray(obj)) {
-                    if (obj.length === 0) return '[]';
-                    obj.forEach(item => {
-                        const isComplex = typeof item === 'object' && item !== null && !(item instanceof Date) && (Array.isArray(item) ? item.length > 0 : Object.keys(item).length > 0);
-                        const itemStr = auxiliary.objectToYaml(item, indentLevel + 1, paddingChar);
-                        // For complex items (objects/arrays), we append the first line to "- " and keep the rest indented.
-                        // objectToYaml returns already indented strings, so we trim the first line's indentation.
-                        yaml += `${indent}- ${itemStr.trimStart()}\n`;
-                    });
-                } else {
-                    const keys = Object.keys(obj);
-                    if (keys.length === 0) return '{}';
-                    keys.forEach(key => {
-                        const value = obj[key];
-                        const isComplex = typeof value === 'object' && value !== null && !(value instanceof Date) && (Array.isArray(value) ? value.length > 0 : Object.keys(value).length > 0);
-                        const valStr = auxiliary.objectToYaml(value, indentLevel + 1, paddingChar);
-                        
-                        if (isComplex) {
-                            // Start complex values on a new line
-                            yaml += `${indent}${key}:\n${valStr}\n`;
-                        } else {
-                            // Simple values on the same line
-                            yaml += `${indent}${key}: ${valStr.trimStart()}\n`;
-                        }
-                    });
-                }
-                return yaml.trimEnd();
-            },
-
-            yamlToObject: function(str) {
-                if (!str || !str.trim()) throw new Error("Empty string");
-
-                const linesArr = str.split(/\r?\n/);
-
-                const parseScalar = (v) => {
-                    v = v.trim();
-                    if (v === 'true') return true;
-                    if (v === 'false') return false;
-                    if (v === 'null') return null;
-                    if (v === '') return null;
-                    if (v === '[]') return [];
-                    if (v === '{}') return {};
-                    
-                    if (v.startsWith('"') && v.endsWith('"')) {
-                        try { return JSON.parse(v); } catch (e) { return v.slice(1, -1); }
-                    }
-                    if (v.startsWith("'") && v.endsWith("'")) return v.slice(1, -1);
-
-                    const num = Number(v);
-                    if (!isNaN(num) && v.trim() !== "") return num;
-                    return v;
-                };
-
-                function parseBlock(startIdx, minIndent) {
-                    let result = null;
-                    let i = startIdx;
-
-                    while (i < linesArr.length) {
-                        const line = linesArr[i];
-                        if (!line.trim() || line.trim().startsWith('#')) { i++; continue; }
-
-                        const indent = line.search(/\S/);
-                        if (indent < minIndent) break;
-
-                        const trimmed = line.trim();
-
-                        if (trimmed.startsWith('-')) {
-                            if (result === null) result = [];
-                            let content = trimmed.substring(1).trim();
-                            
-                            if (content === '|' || content === '>') {
-                                const mode = content;
-                                let blockLines = [];
-                                i++;
-                                let blockIndent = -1;
-                                while (i < linesArr.length) {
-                                    if (!linesArr[i].trim()) { blockLines.push(""); i++; continue; }
-                                    const nextIndent = linesArr[i].search(/\S/);
-                                    if (blockIndent === -1) blockIndent = nextIndent;
-                                    if (nextIndent < blockIndent) break;
-                                    blockLines.push(linesArr[i].substring(blockIndent));
-                                    i++;
-                                }
-                                result.push(mode === '|' ? blockLines.join('\n') : blockLines.join(' ').trim());
-                            } else if (!content) {
-                                const sub = parseBlock(i + 1, indent + 1);
-                                result.push(sub.data);
-                                i = sub.nextIdx;
-                            } else {
-                                const kv = content.match(/^([^:]+):\s*(.*)$/);
-                                const isCompactList = content.startsWith('-');
-                                
-                                if (kv || isCompactList) {
-                                    // Compact sequence or mapping: start a sub-block at the current position
-                                    // but we need to pass a string that doesn't have the parent's "-"
-                                    const spaces = " ".repeat(line.indexOf('-') + 1);
-                                    const virtualLine = spaces + " " + content;
-                                    const originalLine = linesArr[i];
-                                    linesArr[i] = virtualLine;
-                                    const sub = parseBlock(i, indent + 1);
-                                    linesArr[i] = originalLine; // restore
-                                    result.push(sub.data);
-                                    i = sub.nextIdx;
-                                } else {
-                                    result.push(parseScalar(content));
-                                    i++;
-                                }
-                            }
-                        } else {
-                            const kv = trimmed.match(/^([^:]+):\s*(.*)$/);
-                            if (kv) {
-                                if (result === null) result = {};
-                                const key = kv[1].trim();
-                                let valStr = kv[2].trim();
-
-                                if (valStr === '|' || valStr === '>') {
-                                    const mode = valStr;
-                                    let blockLines = [];
-                                    i++;
-                                    let blockIndent = -1;
-                                    while (i < linesArr.length) {
-                                        if (!linesArr[i].trim()) { blockLines.push(""); i++; continue; }
-                                        const nextIndent = linesArr[i].search(/\S/);
-                                        if (blockIndent === -1) blockIndent = nextIndent;
-                                        if (nextIndent < blockIndent) break;
-                                        blockLines.push(linesArr[i].substring(blockIndent));
-                                        i++;
-                                    }
-                                    result[key] = mode === '|' ? blockLines.join('\n') : blockLines.join(' ').trim();
-                                } else if (!valStr) {
-                                    const sub = parseBlock(i + 1, indent + 1);
-                                    result[key] = sub.data;
-                                    i = sub.nextIdx;
-                                } else {
-                                    result[key] = parseScalar(valStr);
-                                    i++;
-                                }
-                            } else {
-                                i++;
-                            }
-                        }
-                    }
-                    return { data: result, nextIdx: i };
-                }
-
-                const parsedResult = parseBlock(0, 0);
-                return parsedResult.data || {};
             },
 
             findJsonRange: function (json, path) {
@@ -1484,7 +1590,7 @@
                         case "XML":
                             return formatXml(value, true, padding);
                         case "YAML":
-                            return auxiliary.objectToYaml(auxiliary.yamlToObject(value), 0, padding);
+                            return shared.objectToYaml(shared.yamlToObject(value), 0, padding);
                         default:
                             console.error("Unsupported formatting lang");
                             return -1;
@@ -1501,7 +1607,7 @@
                         case "YAML":
                             // YAML minification isn't standard like JSON/XML.
                             // We return a "clean" block-style version (normalized, no comments).
-                            return auxiliary.objectToYaml(auxiliary.yamlToObject(value), 0, "  ");
+                            return shared.objectToYaml(shared.yamlToObject(value), 0, "  ");
                         default:
                             console.error("Unsupported formatting lang");
                             return -1;
@@ -1836,51 +1942,21 @@
             }
         }
 
+        const detectFormatWorkerScript = new Blob([
+            document.querySelector('#shared').textContent +
+            document.querySelector('#detectFormatWorker').textContent
+        ], {type: "text/javascript"});
+        const detectFormatWorker = new Worker(window.URL.createObjectURL(detectFormatWorkerScript));
+
         function detectFormatOrLanguage() {
             const valueTextArea = getValueElement();
             const value = valueTextArea.value;
 
-            // Check for JSON (three-state return)
-            const jsonCheckResult = auxiliary.isJson(value);
-            if (jsonCheckResult.valid === true) {
-                return { type: "JSON", valid: true, data: jsonCheckResult.data };
-            } else if (typeof jsonCheckResult === 'object') {
-                console.error("Malformed JSON detected: " + jsonCheckResult.message);
-                return { type: "JSON", valid: false, error: jsonCheckResult };
+            showLoader();
+            detectFormatWorker.postMessage(value);
+            detectFormatWorker.onmessage = function(event) {
+                updateDetectedFormatDisplay(event.data);
             }
-
-            // Check for XML (three-state return)
-            const xmlCheckResult = auxiliary.isXml(value);
-            if (xmlCheckResult === true) {
-                return { type: "XML", valid: true };
-            } else if (typeof xmlCheckResult === 'object') {
-                console.error("Malformed XML detected: " + xmlCheckResult.message);
-                return { type: "XML", valid: false, error: xmlCheckResult };
-            }
-
-            // Check for YAML (three-state return)
-            if (auxiliary.isYaml(value) === true) {
-                try {
-                    const data = auxiliary.yamlToObject(value);
-                    return { type: "YAML", valid: true, data: data };
-                } catch (e) {
-                    console.error("Malformed YAML detected: " + e.message);
-                    return { type: "YAML", valid: false, error: e };
-                }
-            }
-            
-            // Check for Base64 (boolean return)
-            if (auxiliary.isBase64(value) === true) {
-                return { type: "Base64", valid: true };
-            }
-            
-            // Check for Hex (boolean return)
-            if (auxiliary.isHex(value) === true) {
-                return { type: "Hex", valid: true };
-            }
-
-            // Format not detected
-            return null;
         }
 
         function rndSpecialChanged(event) {
@@ -2039,7 +2115,6 @@
                 if(mode === "template") {
                     document.getElementById("replicateRange").style.display = "none";
                     document.getElementById("replicateTemplateItems").style.display = "inherit";
-                    replicateTemplateItems
                 } else {
                     document.getElementById("replicateRange").style.display = "inherit";
                     document.getElementById("replicateTemplateItems").style.display = "none";
@@ -2047,15 +2122,22 @@
             }
         }
 
+        function showLoader() {
+            const detectedFormatDiv = document.getElementById("detectedFormatDiv");
+            detectedFormatDiv.querySelector(".loader").style.display = "block";
+        }
+
         function updateDetectedFormatDisplay(detected) {
+            console.log("Detected format:", detected);
             const detectedFormatDiv = document.getElementById("detectedFormatDiv");
             const formatIdentifier = document.getElementById("formatIdentifier");
             const formatValidity = document.getElementById("formatValidity");
             const objectTreeContainer = document.getElementById("objectTree");
             const formattingLangSelect = document.getElementById("formattingLang");
 
+            detectedFormatDiv.querySelector(".loader").style.display = "none";
+
             if(detected == null) {
-                detectedFormatDiv.style.display = "none";
                 formatIdentifier.innerText = "";
                 formatValidity.innerText = "";
                 formattingLangSelect.value = "JSON";
@@ -2067,7 +2149,6 @@
                 return;
             }
 
-            detectedFormatDiv.style.display = "block";
             formatIdentifier.innerText = detected.type;
 
             if(detected.valid === false) {
@@ -2114,7 +2195,7 @@
             getValueElement().value = value;
             flashValue();
             fetchData();
-            updateDetectedFormatDisplay(detectFormatOrLanguage());
+            detectFormatOrLanguage();
         }
 
         /**
@@ -2241,8 +2322,8 @@
                                     'Copy Path': (e) => copyToCb(path, e.target)
                                 }),
                                 group('YAML', {
-                                    'Copy': (e) => copyToCb(auxiliary.objectToYaml(value, 0, formatWhitepacePadding()), e.target),
-                                    'Apply': () => applyValueToMain(auxiliary.objectToYaml(value, 0, formatWhitepacePadding()))
+                                    'Copy': (e) => copyToCb(shared.objectToYaml(value, 0, formatWhitepacePadding()), e.target),
+                                    'Apply': () => applyValueToMain(shared.objectToYaml(value, 0, formatWhitepacePadding()))
                                 })
                             ] : [
                                 btn('Copy Value', '', (e) => copyToCb(typeof value === 'string' ? value : JSON.stringify(value), e.target)),
@@ -2474,7 +2555,8 @@
         <div>Start: <span id="start"></span></div><div>End: <span id="end"></span></div>
         <div>Selection: <span id="selection"></span></div><div>Length: <span id="length"></span></div>
     </div>
-    <div style="float: right; clear: right; position: relative; font-size: small; padding-top: 0.3rem; text-align: end; display: none" id="detectedFormatDiv">
+    <div style="float: right; clear: right; position: relative; font-size: small; padding-top: 0.3rem; text-align: end;" id="detectedFormatDiv">
+        <div class="loader" style="display: none;"></div>
         <span id="formatIdentifier" class="error-tag" style="display: block; float: right;"></span>
         <span id="formatValidity" style="color: orange; padding-top: 0.2rem; display: block; clear: right; max-width: 25rem;"></span>
     </div>
